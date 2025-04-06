@@ -95,4 +95,57 @@ The application uses Socket.IO for real-time updates. The following events are a
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
+
+## Deployment Guide for Cloudflare Pages
+
+### Prerequisites
+- Cloudflare account
+- Wrangler CLI installed (`npm install -g wrangler`)
+- Logged in to Wrangler (`wrangler login`)
+
+### Deployment Steps
+
+1. **Build the application**
+   ```
+   npm run build
+   ```
+
+2. **Deploy to Cloudflare Pages**
+   ```
+   npm run deploy
+   ```
+   
+   Alternatively, you can run:
+   ```
+   wrangler pages deploy client/build
+   ```
+
+3. **Environment Variables**
+   Make sure to set these environment variables in your Cloudflare Pages project settings:
+   - `REACT_APP_API_URL`: URL to your API backend
+   - `NODE_ENV`: Set to `production`
+
+### Server Deployment
+For the server component, you can deploy to Cloudflare Workers or any other backend service:
+
+1. **Configure API URL**
+   Update the `.env.production` file with your API URL.
+
+2. **Deploy Server**
+   Deploy the server code according to your backend service requirements.
+
+## Local Development
+
+1. **Install dependencies**
+   ```
+   npm run setup
+   ```
+
+2. **Start development servers**
+   ```
+   npm run dev
+   ```
+
+3. **Access the application**
+   Open [http://localhost:3000](http://localhost:3000) in your browser. 

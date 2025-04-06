@@ -1,0 +1,22 @@
+[env.production]
+name = "pointage-app"
+route = "pointage.example.com/*"
+zone_id = ""  # Your Cloudflare zone ID
+
+[site]
+bucket = "./client/build"
+entry-point = "workers-site"
+
+[build]
+command = "npm run build"
+upload.format = "service-worker"
+
+[build.upload]
+dir = "client/build"
+
+[env]
+NODE_ENV = "production"
+
+name = "pointage-workers-api"
+main = "index.js"
+compatibility_date = "2023-05-18" 

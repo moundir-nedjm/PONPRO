@@ -1,0 +1,26 @@
+name = "pointage-api"
+main = "index.js"
+compatibility_date = "2023-12-01"
+
+# KV Namespace for data storage (alternative to MongoDB)
+kv_namespaces = [
+  { binding = "POINTAGE_DB", id = "c10599bf6a58430c949804b474341a6f", preview_id = "9df50ec6f59a42c48641b86d584339cf" }
+]
+
+[vars]
+JWT_SECRET = "your-jwt-secret-change-this-in-production"
+
+# Routes
+routes = [
+  { pattern = "api-pointage.workers.dev/*", zone_name = "" }
+]
+
+# Enable Durable Objects for WebSocket connections
+[durable_objects]
+bindings = [
+  { name = "CONNECTIONS", class_name = "ConnectionsObject" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ConnectionsObject"] 
