@@ -150,12 +150,34 @@ const DepartmentList = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      await axios.delete(`/api/departments/${selectedDepartment._id}`);
+      // Check if the department has employees before trying to delete
+      if (selectedDepartment && selectedDepartment.employeeCount > 0) {
+        setError('Impossible de supprimer un département contenant des employés. Veuillez d\'abord réassigner ou supprimer les employés.');
+        setDeleteDialogOpen(false);
+        return;
+      }
+      
+      const response = await axios.delete(`/api/departments/${selectedDepartment._id}`);
+      
+      if (response.data.success) {
+        // Remove the department from the local state to avoid having to refetch
+        setDepartments(prev => prev.filter(dept => dept._id !== selectedDepartment._id));
+        // Also update filtered departments
+        setFilteredDepartments(prev => prev.filter(dept => dept._id !== selectedDepartment._id));
+        // Update stats
+        updateStats(departments.filter(dept => dept._id !== selectedDepartment._id));
+        
+        // Show success message
+        setError(null);
+      }
+      
       setDeleteDialogOpen(false);
-      fetchDepartments();
     } catch (err) {
       console.error('Erreur lors de la suppression du département:', err);
-      setError('Impossible de supprimer le département. Veuillez réessayer plus tard.');
+      // Display the specific error message from the API if available
+      const errorMessage = err.response?.data?.message || 
+                          'Impossible de supprimer le département. Veuillez réessayer plus tard.';
+      setError(errorMessage);
       setDeleteDialogOpen(false);
     }
   };
@@ -530,12 +552,19 @@ const DepartmentList = () => {
                             <EditIcon />
                           </IconButton>
                         </Tooltip>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, department)}
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
+                        <Tooltip title={department.employeeCount > 0 ? 
+                          "Ce département contient des employés et ne peut pas être supprimé" : 
+                          "Options supplémentaires"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleMenuOpen(e, department)}
+                              color={department.employeeCount > 0 ? "default" : "primary"}
+                            >
+                              <MoreVertIcon />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))
@@ -581,12 +610,26 @@ const DepartmentList = () => {
           <ListItemText>Modifier</ListItemText>
         </MenuItem>
         <Divider />
-        <MenuItem onClick={handleDeleteClick}>
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" color="error" />
-          </ListItemIcon>
-          <ListItemText sx={{ color: 'error.main' }}>Supprimer</ListItemText>
-        </MenuItem>
+        <Tooltip 
+          title={selectedDepartment && selectedDepartment.employeeCount > 0 ? 
+            "Impossible de supprimer un département contenant des employés" : ""}
+          placement="left"
+        >
+          <div>
+            <MenuItem 
+              onClick={handleDeleteClick}
+              disabled={selectedDepartment && selectedDepartment.employeeCount > 0}
+              sx={{
+                opacity: selectedDepartment && selectedDepartment.employeeCount > 0 ? 0.5 : 1,
+              }}
+            >
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" color="error" />
+              </ListItemIcon>
+              <ListItemText sx={{ color: 'error.main' }}>Supprimer</ListItemText>
+            </MenuItem>
+          </div>
+        </Tooltip>
       </Menu>
 
       {/* Dialogue de confirmation de suppression */}
@@ -599,15 +642,21 @@ const DepartmentList = () => {
           <DialogContentText>
             Êtes-vous sûr de vouloir supprimer le département "{selectedDepartment?.name}"? Cette action ne peut pas être annulée.
             {selectedDepartment && selectedDepartment.employeeCount > 0 && (
-              <Box component="span" sx={{ display: 'block', mt: 1, color: 'error.main' }}>
-                Attention: Ce département contient {selectedDepartment.employeeCount} employé(s). La suppression peut affecter ces employés.
+              <Box component="span" sx={{ display: 'block', mt: 1, color: 'error.main', fontWeight: 'bold' }}>
+                Attention: Ce département contient {selectedDepartment.employeeCount} employé(s). 
+                La suppression n'est pas possible. Veuillez d'abord réassigner ou supprimer ces employés.
               </Box>
             )}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDeleteCancel}>Annuler</Button>
-          <Button onClick={handleDeleteConfirm} color="error" autoFocus>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            autoFocus
+            disabled={selectedDepartment && selectedDepartment.employeeCount > 0}
+          >
             Supprimer
           </Button>
         </DialogActions>

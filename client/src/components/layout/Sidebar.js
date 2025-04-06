@@ -202,11 +202,6 @@ const menuItems = [
         title: 'Ajouter un Employé',
         path: '/employees/new',
         roles: ['admin']
-      },
-      {
-        title: 'Détails de l\'Employé',
-        path: '/employees/schedules',
-        roles: ['admin', 'manager']
       }
     ]
   },
@@ -281,7 +276,7 @@ const menuItems = [
     title: 'Départements',
     path: '/departments',
     icon: <BusinessIcon />,
-    roles: ['admin']
+    roles: ['admin', 'manager', 'chef']
   },
   {
     title: 'Rapports',
@@ -352,14 +347,14 @@ const menuItems = [
         roles: ['admin']
       },
       {
-        title: 'Biométrique',
-        path: '/admin/settings/biometrics',
-        roles: ['admin']
-      },
-      {
         title: 'Gestion des Accès',
         path: '/admin/settings/access',
         roles: ['admin']
+      },
+      {
+        title: 'Détails de l\'Employé',
+        path: '/employees/settings',
+        roles: ['admin', 'manager']
       },
       {
         title: 'General',
@@ -379,14 +374,14 @@ const menuItems = [
         path: '/admin/settings/organization',
         roles: ['admin'],
         description: 'Configurer les paramètres globaux de l\'organisation'
-      },
-      {
-        title: 'Biométrie',
-        path: '/admin/settings/biometrics',
-        roles: ['admin'],
-        description: 'Configurer les paramètres de reconnaissance biométrique'
       }
     ]
+  },
+  {
+    title: 'Biométrie de l\'équipe',
+    icon: <FaceIcon />,
+    path: '/team-biometrics',
+    roles: ['team_leader', 'admin', 'chef']
   }
 ];
 

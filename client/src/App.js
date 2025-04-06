@@ -8,6 +8,7 @@ import { SettingsProvider } from './context/SettingsContext';
 import { SocketProvider } from './context/SocketContext';
 import { AttendanceProvider } from './context/AttendanceContext';
 import { OrganizationProvider } from './context/OrganizationContext';
+import { BiometricProvider } from './context/BiometricContext';
 
 // Layout Components
 import Layout from './components/layout/Layout';
@@ -32,6 +33,7 @@ import EmployeeList from './pages/employees/EmployeeList';
 import EmployeeDetail from './pages/employees/EmployeeDetail';
 import EmployeeForm from './pages/employees/EmployeeForm';
 import EmployeeSchedule from './pages/employees/EmployeeSchedule';
+import EmployeeSettings from './pages/employees/EmployeeSettings';
 
 // Attendance Pages
 import AttendanceList from './pages/attendance/AttendanceList';
@@ -85,6 +87,9 @@ import AccessManagement from './pages/admin/settings/access';
 import Help from './pages/help';
 import ArticleDetail from './pages/help/ArticleDetail';
 import SectionDetail from './pages/help/SectionDetail';
+
+// Team Biometric Management
+import TeamBiometricManagement from './pages/biometrics/TeamBiometricManagement';
 
 // Create a separate component that uses the settings context
 const AppWithTheme = () => {
@@ -167,6 +172,7 @@ const AppWithTheme = () => {
             <Route path=":id/schedule" element={<EmployeeSchedule />} />
             <Route path="new" element={<EmployeeForm />} />
             <Route path="edit/:id" element={<EmployeeForm />} />
+            <Route path="settings" element={<EmployeeSettings />} />
           </Route>
 
           {/* Routes de l'Espace Employé */}
@@ -265,6 +271,16 @@ const AppWithTheme = () => {
               } />
             </Route>
           </Route>
+
+          {/* Team Biometric Management Route */}
+          <Route 
+            path="/team-biometrics" 
+            element={
+              <ProtectedRoute allowedRoles={['team_leader', 'admin', 'chef']}>
+                <TeamBiometricManagement />
+              </ProtectedRoute>
+            } 
+          />
         </Route>
 
         {/* Error Routes */}
@@ -283,7 +299,9 @@ function App() {
         <SocketProvider>
           <OrganizationProvider>
             <AttendanceProvider>
-              <AppWithTheme />
+              <BiometricProvider>
+                <AppWithTheme />
+              </BiometricProvider>
             </AttendanceProvider>
           </OrganizationProvider>
         </SocketProvider>

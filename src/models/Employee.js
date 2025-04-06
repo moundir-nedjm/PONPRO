@@ -103,6 +103,55 @@ const EmployeeSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: false
+  },
+  // Added biometric enrollment tracking fields
+  biometricStatus: {
+    faceRecognition: {
+      enrolled: {
+        type: Boolean,
+        default: false
+      },
+      status: {
+        type: String,
+        enum: ['not_started', 'in_progress', 'completed', 'validated', 'rejected'],
+        default: 'not_started'
+      },
+      enrollmentDate: Date,
+      lastUpdated: Date,
+      validatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      validationDate: Date,
+      validationNotes: String,
+      samplesCount: {
+        type: Number,
+        default: 0
+      }
+    },
+    fingerprint: {
+      enrolled: {
+        type: Boolean,
+        default: false
+      },
+      status: {
+        type: String,
+        enum: ['not_started', 'in_progress', 'completed', 'validated', 'rejected'],
+        default: 'not_started'
+      },
+      enrollmentDate: Date,
+      lastUpdated: Date,
+      validatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      validationDate: Date,
+      validationNotes: String,
+      samplesCount: {
+        type: Number,
+        default: 0
+      }
+    }
   }
 });
 

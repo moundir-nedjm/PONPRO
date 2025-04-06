@@ -1,56 +1,42 @@
 const express = require('express');
-const {
-  getEmployees,
-  getEmployee,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-  createEmployeeAccount,
-  getEmployeeDashboard,
-  getEmployeeStats,
-  getEmployeeBiometrics,
-  saveEmployeeBiometrics,
-  getEmployeeBarcode
-} = require('../controllers/employeeController');
-
-const { protect, authorize } = require('../middleware/auth');
-
-// Include other resource routers
-const scheduleRouter = require('./schedules');
+const { protect } = require('../middleware/auth');
+const employeeController = require('../controllers/employeeController');
 
 const router = express.Router();
 
-// Protect all routes
-router.use(protect);
+// Get all employees or create a new employee
+router
+  .route('/')
+  .get(protect, employeeController.getEmployees)
+  .post(protect, employeeController.createEmployee);
 
-// Employee routes
-router.route('/')
-  .get(getEmployees)
-  .post(authorize('admin', 'manager'), createEmployee);
+// Get, update, or delete a specific employee by ID
+router
+  .route('/:id')
+  .get(protect, employeeController.getEmployee)
+  .put(protect, employeeController.updateEmployee)
+  .delete(protect, employeeController.deleteEmployee);
 
-router.route('/:id')
-  .get(getEmployee)
-  .put(authorize('admin', 'manager'), updateEmployee)
-  .delete(authorize('admin'), deleteEmployee);
+// Biometric status routes
+router
+  .route('/:id/biometric-status')
+  .get(protect, employeeController.getBiometricStatus)
+  .put(protect, employeeController.updateBiometricStatus);
 
-// Create user account for employee
-router.post('/:id/account', authorize('admin'), createEmployeeAccount);
-
-// Get employee dashboard data
-router.get('/:id/dashboard', getEmployeeDashboard);
-
-// Get employee stats
-router.get('/:id/stats', getEmployeeStats);
+// Biometric validation route (team leaders and admins only)
+router.put(
+  '/:id/validate-biometric',
+  protect,
+  employeeController.validateBiometricEnrollment
+);
 
 // Employee biometrics routes
-router.route('/:id/biometrics')
-  .get(getEmployeeBiometrics)
-  .post(saveEmployeeBiometrics);
+router
+  .route('/:id/biometrics')
+  .get(protect, employeeController.getEmployeeBiometrics)
+  .post(protect, employeeController.saveEmployeeBiometrics);
 
 // Employee barcode route
-router.get('/:id/barcode', getEmployeeBarcode);
-
-// Re-route into other resource routers
-router.use('/:employeeId/schedules', scheduleRouter);
+router.get('/:id/barcode', protect, employeeController.getEmployeeBarcode);
 
 module.exports = router; 

@@ -49,11 +49,11 @@ root.render(
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
         <AuthProvider>
           <SettingsProvider>
-            <AttendanceProvider>
-              <SocketProvider>
+            <SocketProvider>
+              <AttendanceProvider>
                 <App />
-              </SocketProvider>
-            </AttendanceProvider>
+              </AttendanceProvider>
+            </SocketProvider>
           </SettingsProvider>
         </AuthProvider>
       </LocalizationProvider>

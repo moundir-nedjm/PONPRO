@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import axios from 'axios';
 
 // Define projects
 const PROJECTS = [
@@ -111,7 +112,31 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      // In a real app, this would be an API call
+      // Try to authenticate with real API first
+      try {
+        const response = await axios.post('http://localhost:5000/api/auth/login', {
+          identifier,
+          password
+        });
+        
+        if (response.data.success) {
+          // Store token if available
+          if (response.data.token) {
+            localStorage.setItem('authToken', response.data.token);
+          }
+          
+          // Set user data
+          setCurrentUser(response.data.user);
+          setIsAuthenticated(true);
+          setLoading(false);
+          return true;
+        }
+      } catch (apiError) {
+        console.log('API authentication failed, falling back to mock data:', apiError);
+        // Continue to mock authentication if API fails
+      }
+      
+      // Fall back to mock authentication
       const user = mockUsers.find(
         u => (u.email === identifier || u.id === identifier) && u.password === password
       );

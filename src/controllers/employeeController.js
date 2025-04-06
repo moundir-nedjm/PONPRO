@@ -562,4 +562,170 @@ exports.getEmployeeBarcode = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+// @desc    Update employee biometric status
+// @route   PUT /api/employees/:id/biometric-status
+// @access  Private
+exports.updateBiometricStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { biometricType, status, samplesCount } = req.body;
+    
+    // Validate biometric type
+    if (!['faceRecognition', 'fingerprint'].includes(biometricType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type de biométrie invalide'
+      });
+    }
+    
+    // Validate status
+    const validStatuses = ['not_started', 'in_progress', 'completed', 'validated', 'rejected'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Statut invalide'
+      });
+    }
+    
+    const updateData = {};
+    
+    // Update status if provided
+    if (status) {
+      updateData[`biometricStatus.${biometricType}.status`] = status;
+      updateData[`biometricStatus.${biometricType}.lastUpdated`] = new Date();
+      
+      // If status is completed, set enrollment date
+      if (status === 'completed') {
+        updateData[`biometricStatus.${biometricType}.enrolled`] = true;
+        updateData[`biometricStatus.${biometricType}.enrollmentDate`] = new Date();
+      }
+      
+      // If status is validated or rejected, set validation info
+      if (status === 'validated' || status === 'rejected') {
+        updateData[`biometricStatus.${biometricType}.validatedBy`] = req.user.id;
+        updateData[`biometricStatus.${biometricType}.validationDate`] = new Date();
+      }
+    }
+    
+    // Update samples count if provided
+    if (samplesCount !== undefined) {
+      updateData[`biometricStatus.${biometricType}.samplesCount`] = samplesCount;
+    }
+    
+    const employee = await Employee.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).populate('department');
+    
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: `Employé avec l'id ${id} non trouvé`
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: employee
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Validate employee biometric enrollment
+// @route   PUT /api/employees/:id/validate-biometric
+// @access  Private (Team Leaders and Admins only)
+exports.validateBiometricEnrollment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { biometricType, decision, notes } = req.body;
+    
+    // Check permissions (only team leaders and admins can validate)
+    if (req.user.role !== 'admin' && req.user.role !== 'team_leader') {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès non autorisé. Seuls les chefs d\'équipe et administrateurs peuvent valider les données biométriques.'
+      });
+    }
+    
+    // Validate biometric type
+    if (!['faceRecognition', 'fingerprint'].includes(biometricType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type de biométrie invalide'
+      });
+    }
+    
+    // Validate decision
+    if (!['validated', 'rejected'].includes(decision)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Décision invalide. Doit être "validated" ou "rejected"'
+      });
+    }
+    
+    const updateData = {
+      [`biometricStatus.${biometricType}.status`]: decision,
+      [`biometricStatus.${biometricType}.validatedBy`]: req.user.id,
+      [`biometricStatus.${biometricType}.validationDate`]: new Date(),
+      [`biometricStatus.${biometricType}.lastUpdated`]: new Date()
+    };
+    
+    // Add notes if provided
+    if (notes) {
+      updateData[`biometricStatus.${biometricType}.validationNotes`] = notes;
+    }
+    
+    const employee = await Employee.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).populate('department');
+    
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: `Employé avec l'id ${id} non trouvé`
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: employee
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get employee biometric status
+// @route   GET /api/employees/:id/biometric-status
+// @access  Private
+exports.getBiometricStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const employee = await Employee.findById(id)
+      .select('firstName lastName employeeId biometricStatus')
+      .populate('biometricStatus.faceRecognition.validatedBy', 'name email')
+      .populate('biometricStatus.fingerprint.validatedBy', 'name email');
+    
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: `Employé avec l'id ${id} non trouvé`
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: employee.biometricStatus
+    });
+  } catch (err) {
+    next(err);
+  }
 }; 

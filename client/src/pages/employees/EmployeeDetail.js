@@ -96,30 +96,77 @@ const EmployeeDetail = () => {
         // Simuler un délai d'appel API
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Données fictives d'employé
-        const mockEmployee = {
-          id: '1',
-          firstName: 'Ahmed',
-          lastName: 'Benali',
-          employeeId: 'EMP001',
-          email: 'ahmed.benali@example.com',
-          phone: '+213 555 123 456',
-          position: 'Développeur Senior',
-          department: { id: '1', name: 'Informatique' },
-          hireDate: '2020-05-15',
-          birthDate: '1988-10-20',
-          gender: 'male',
-          nationalId: '88102012345',
-          address: {
-            street: '15 Rue des Oliviers',
-            city: 'Alger',
-            wilaya: 'Alger',
-            postalCode: '16000'
+        // Récupérer la liste des employés pour trouver celui avec l'ID correspondant
+        const allEmployees = [
+          {
+            id: '1',
+            firstName: 'Ahmed',
+            lastName: 'Benali',
+            employeeId: 'EMP001',
+            email: 'ahmed.benali@example.com',
+            phone: '+213 555 123 456',
+            position: 'Développeur Senior',
+            department: { id: '1', name: 'Informatique' },
+            hireDate: '2020-05-15',
+            birthDate: '1988-10-20',
+            gender: 'male',
+            nationalId: '88102012345',
+            address: {
+              street: '15 Rue des Oliviers',
+              city: 'Alger',
+              wilaya: 'Alger',
+              postalCode: '16000'
+            },
+            active: true
           },
-          active: true
-        };
+          {
+            id: '2',
+            firstName: 'Fatima',
+            lastName: 'Zahra',
+            employeeId: 'EMP002',
+            email: 'fatima.zahra@example.com',
+            phone: '+213 555 789 012',
+            position: 'Responsable RH',
+            department: { id: '2', name: 'Ressources Humaines' },
+            hireDate: '2019-03-10',
+            birthDate: '1990-05-15',
+            gender: 'female',
+            nationalId: '90051523456',
+            address: {
+              street: '22 Boulevard Mohamed V',
+              city: 'Oran',
+              wilaya: 'Oran',
+              postalCode: '31000'
+            },
+            active: true
+          },
+          {
+            id: '3',
+            firstName: 'Mohammed',
+            lastName: 'Kaci',
+            employeeId: 'EMP003',
+            email: 'mohammed.kaci@example.com',
+            phone: '+213 555 345 678',
+            position: 'Comptable',
+            department: { id: '3', name: 'Finance' },
+            hireDate: '2021-01-20',
+            birthDate: '1985-12-05',
+            gender: 'male',
+            nationalId: '85120567890',
+            address: {
+              street: '8 Rue Didouche Mourad',
+              city: 'Constantine',
+              wilaya: 'Constantine',
+              postalCode: '25000'
+            },
+            active: true
+          }
+        ];
         
-        // Données fictives de pointage
+        // Trouver l'employé correspondant à l'ID
+        const foundEmployee = allEmployees.find(emp => emp.id === id) || allEmployees[0];
+        
+        // Données fictives de pointage adaptées à l'employé
         const mockAttendance = [
           { id: '1', date: '2023-09-01', checkIn: '08:45', checkOut: '17:30', status: 'present', workHours: 8.75 },
           { id: '2', date: '2023-09-02', checkIn: '08:30', checkOut: '17:15', status: 'present', workHours: 8.75 },
@@ -135,7 +182,7 @@ const EmployeeDetail = () => {
           { id: '3', startDate: '2023-10-02', endDate: '2023-10-03', type: 'unpaid', status: 'pending', days: 2 }
         ];
         
-        setEmployee(mockEmployee);
+        setEmployee(foundEmployee);
         setAttendanceRecords(mockAttendance);
         setLeaveRecords(mockLeaves);
         setLoading(false);
