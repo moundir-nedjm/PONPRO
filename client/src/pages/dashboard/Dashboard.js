@@ -60,18 +60,35 @@ const Dashboard = () => {
         const storedDeletedIds = localStorage.getItem('pointgee_deleted_employees');
         const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
         
-        // Fetch departments from the API
+        // Fetch departments from the API - different approach for chef vs admin
         let departments = [];
         try {
-          const response = await apiClient.get('/departments');
-          if (response.data.success) {
-            departments = response.data.data.map(dept => ({
-              name: dept.name,
-              description: dept.description,
-              employeeCount: dept.employeeCount || 0,
-              active: dept.active
-            }));
-            console.log('Fetched departments:', departments);
+          // For chef de projet, only get their departments
+          if (currentUser && currentUser.role === 'chef' && currentUser.projects) {
+            // Get only the departments that the chef is responsible for
+            const chefDepartments = currentUser.projects.join(',');
+            const response = await apiClient.get(`/departments?names=${chefDepartments}`);
+            if (response.data.success) {
+              departments = response.data.data.map(dept => ({
+                name: dept.name,
+                description: dept.description,
+                employeeCount: dept.employeeCount || 0,
+                active: dept.active
+              }));
+              console.log('Fetched chef departments:', departments);
+            }
+          } else {
+            // For admin, get all departments
+            const response = await apiClient.get('/departments');
+            if (response.data.success) {
+              departments = response.data.data.map(dept => ({
+                name: dept.name,
+                description: dept.description,
+                employeeCount: dept.employeeCount || 0,
+                active: dept.active
+              }));
+              console.log('Fetched all departments:', departments);
+            }
           }
         } catch (err) {
           console.error('Error fetching departments from API:', err);
@@ -86,6 +103,13 @@ const Dashboard = () => {
             { name: 'ADM SETIF', employeeCount: 6 },
             { name: 'ADM HMD', employeeCount: 7 }
           ];
+          
+          // If chef de projet, filter demo data too
+          if (currentUser && currentUser.role === 'chef' && currentUser.projects) {
+            departments = departments.filter(dept => 
+              currentUser.projects.includes(dept.name)
+            );
+          }
         }
         
         // If no departments with employeeCount, generate default counts
@@ -106,28 +130,13 @@ const Dashboard = () => {
         const allAbsent = Math.round(10 * attendanceRatio);
         const allLate = Math.round(6 * attendanceRatio);
         
-        // Filter data based on user role
+        // For chef de projet, we've already filtered departments,
+        // so we don't need additional filtering here
         let filteredProjects = departments;
         let totalEmployees = allEmployees;
         let presentToday = allPresent;
         let absentToday = allAbsent;
         let lateToday = allLate;
-        
-        // If user is a team leader, filter data for their project
-        if (currentUser && currentUser.role === 'chef' && currentUser.projects) {
-          filteredProjects = departments.filter(project => 
-            currentUser.projects.includes(project.name)
-          );
-          
-          // Calculate totals for filtered projects
-          totalEmployees = filteredProjects.reduce((sum, project) => sum + project.employeeCount, 0);
-          
-          // Calculate proportionally the attendance for filtered projects
-          const ratio = totalEmployees / allEmployees;
-          presentToday = Math.round(allPresent * ratio);
-          absentToday = Math.round(allAbsent * ratio);
-          lateToday = Math.round(allLate * ratio);
-        }
         
         // Mock data for recent attendance
         const recentAttendance = [
@@ -249,7 +258,7 @@ const Dashboard = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          {currentUser.role === 'chef' 
+          {currentUser.role === 'chef' && currentUser.projects
             ? `Tableau de Bord - ${currentUser.projects.join(', ')}` 
             : 'Tableau de Bord'}
         </Typography>
@@ -294,7 +303,7 @@ const Dashboard = () => {
                 {dashboardData.totalEmployees}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {currentUser.role === 'chef' 
+                {currentUser.role === 'chef' && currentUser.projects
                   ? `Total des employés de ${currentUser.projects.join(', ')}` 
                   : 'Total des employés'}
               </Typography>
@@ -370,7 +379,7 @@ const Dashboard = () => {
             <CardHeader 
               title={
                 <Typography variant="h6">
-                  {currentUser.role === 'chef' 
+                  {currentUser.role === 'chef' && currentUser.projects
                     ? `Présence - ${currentUser.projects.join(', ')}` 
                     : 'Présence Aujourd\'hui'}
                 </Typography>
@@ -390,7 +399,7 @@ const Dashboard = () => {
             <CardHeader 
               title={
                 <Typography variant="h6">
-                  {currentUser.role === 'chef' 
+                  {currentUser.role === 'chef' && currentUser.projects
                     ? `Employés par Projet - ${currentUser.projects.join(', ')}` 
                     : 'Employés par Projet'}
                 </Typography>

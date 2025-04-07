@@ -54,7 +54,7 @@ const Layout = () => {
           </IconButton>
           
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            POINPRO {currentUser?.role === 'chef' && `- ${currentUser.projects.join(', ')}`}
+            POINPRO {currentUser?.role === 'chef' && currentUser.projects && `- ${currentUser.projects.join(', ')}`}
           </Typography>
           
           <Box sx={{ display: 'flex', alignItems: 'center' }}>

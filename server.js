@@ -3,40 +3,18 @@ const cors = require('cors');
 const path = require('path');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
 
-// Mock mongoose methods for development
-mongoose.connect = function() {
-  console.log('Using mock MongoDB connection');
-  return Promise.resolve();
-};
+// Load environment variables
+dotenv.config();
 
-// Create a mock function implementation
-const mockFunction = () => {
-  const fn = function() { return fn; };
-  fn.mockReturnThis = function() { return fn; };
-  fn.mockResolvedValue = function(val) { 
-    fn.resolvedValue = val;
-    return fn;
-  };
-  fn.exec = function() { return Promise.resolve(fn.resolvedValue || []); };
-  fn.then = function(resolve) { resolve(fn.resolvedValue || []); return Promise.resolve(fn.resolvedValue || []); };
-  return fn;
-};
-
-// Mock mongoose model
-mongoose.model = function(modelName) {
-  console.log(`Creating mock model for ${modelName}`);
-  return {
-    find: mockFunction().mockResolvedValue([]),
-    findOne: mockFunction().mockResolvedValue({}),
-    findById: mockFunction().mockResolvedValue({}),
-    populate: mockFunction().mockResolvedValue([]),
-    exec: function() { return Promise.resolve([]); },
-    create: function() { return Promise.resolve({}); },
-    updateOne: function() { return Promise.resolve({ modifiedCount: 1 }); },
-    deleteOne: function() { return Promise.resolve({ deletedCount: 1 }); },
-  };
-};
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/poinpro', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB Connected'))
+.catch(err => console.error('MongoDB Connection Error:', err));
 
 // Import routes
 const authRoutes = require('./src/routes/auth');

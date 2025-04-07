@@ -22,8 +22,17 @@ exports.getDepartments = async (req, res, next) => {
     // Create operators ($gt, $gte, etc)
     queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
 
+    // Parse the query
+    let parsedQuery = JSON.parse(queryStr);
+
+    // Add filter for department names if provided
+    if (req.query.names) {
+      const departmentNames = req.query.names.split(',');
+      parsedQuery.name = { $in: departmentNames };
+    }
+
     // Finding resource
-    query = Department.find(JSON.parse(queryStr));
+    query = Department.find(parsedQuery);
 
     // Populate if requested
     if (req.query.populate === 'true') {

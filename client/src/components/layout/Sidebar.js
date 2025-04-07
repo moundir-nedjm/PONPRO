@@ -89,10 +89,12 @@ const DrawerHeader = styled(Box)(({ theme }) => ({
   borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
 }));
 
-const StyledListItemButton = styled(ListItemButton)(({ theme, active }) => ({
+const StyledListItemButton = styled(ListItemButton)(({ theme, active, open }) => ({
   margin: theme.spacing(0.5, 1),
   borderRadius: theme.shape.borderRadius,
   transition: 'all 0.2s ease-in-out',
+  minHeight: 48,
+  justifyContent: open ? 'initial' : 'center',
   '&:hover': {
     backgroundColor: alpha(theme.palette.primary.main, 0.06),
   },
@@ -106,6 +108,11 @@ const StyledListItemButton = styled(ListItemButton)(({ theme, active }) => ({
       color: theme.palette.primary.main,
     },
   }),
+  '& .MuiListItemIcon-root': {
+    minWidth: 0,
+    marginRight: open ? theme.spacing(2) : 'auto',
+    justifyContent: 'center',
+  },
 }));
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
@@ -188,10 +195,6 @@ const menuItems = [
     path: '/employees',
     icon: <PeopleIcon />,
     roles: ['admin', 'manager'],
-    badge: {
-      content: 'Nouveau',
-      color: 'success'
-    },
     submenu: [
       {
         title: 'Liste des Employés',
@@ -263,7 +266,7 @@ const menuItems = [
       {
         title: 'Codes de Pointage',
         path: '/attendance/codes',
-        roles: ['admin', 'chef']
+        roles: ['admin']
       },
       {
         title: 'Statistiques',
@@ -276,7 +279,7 @@ const menuItems = [
     title: 'Départements',
     path: '/departments',
     icon: <BusinessIcon />,
-    roles: ['admin', 'manager', 'chef']
+    roles: ['admin']
   },
   {
     title: 'Rapports',
@@ -513,7 +516,7 @@ const Sidebar = ({ open, toggleDrawer }) => {
           p: 2, 
           display: 'flex', 
           flexDirection: 'column', 
-          alignItems: 'center',
+          alignItems: 'center', 
           mb: 1,
           mt: 1
         }}>
@@ -627,6 +630,7 @@ const Sidebar = ({ open, toggleDrawer }) => {
                         to={hasSubmenu ? undefined : item.path}
                         onClick={hasSubmenu ? () => handleToggleSubmenu(item.path) : undefined}
                         active={isItemActive ? 1 : 0}
+                        open={open}
                         sx={{
                           px: 2.5,
                           minHeight: 44,

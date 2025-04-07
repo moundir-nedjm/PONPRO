@@ -313,58 +313,85 @@ const DocumentManagement = () => {
     
     try {
       // Get authentication token
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       
       // Get deleted document IDs from localStorage
       const storedDeletedIds = localStorage.getItem('deletedDocumentIds');
       const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
       
-      if (!token) {
-        // If no token, use mock data
-        console.log('No authentication token found, using mock data');
+      let documentData = [];
+      
+      // Try to fetch documents from API
+      try {
+        const response = await axios.get('/api/documents', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        // Filter out deleted documents from mock data
-        const filteredMockData = mockDocuments.filter(doc => 
-          !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
-        );
-        
-        setDocuments(filteredMockData);
-        setFilteredDocuments(filteredMockData);
-        
-        if (isAdmin || isChef) {
-          // Also filter team documents
-          const filteredTeamData = mockTeamDocuments.filter(doc => 
-            !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
-          );
-          setTeamDocuments(filteredTeamData);
+        if (response.data && response.data.success) {
+          documentData = response.data.data || [];
+          console.log('Successfully fetched documents from API:', documentData.length);
+        } else {
+          console.log('API returned no documents or invalid format, using fallback data');
+          throw new Error('Invalid API response format');
         }
-        return;
+      } catch (apiError) {
+        console.error('API error details:', apiError);
+        
+        // If API call failed, use mock data but don't show error message if it's just 
+        // because the API isn't available in development environment
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Using mock data in development environment');
+        } else {
+          // In production, show the error message
+          setError('Erreur lors du chargement des documents. Utilisation des données de démonstration.');
+        }
+        
+        // Use mock data as fallback
+        documentData = mockDocuments;
       }
       
-      // Make API call to get documents based on user role
-      const response = await fetch('/api/documents', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch documents: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Filter out deleted documents from API response
-      const filteredData = data.filter(doc => 
+      // Filter out deleted documents
+      const filteredData = documentData.filter(doc => 
         !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
       );
       
       setDocuments(filteredData);
       setFilteredDocuments(filteredData);
+      
+      // If admin or chef, also fetch team documents
+      if (isAdmin || isChef) {
+        let teamData = [];
+        
+        try {
+          const teamResponse = await axios.get('/api/documents/team', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (teamResponse.data && teamResponse.data.success) {
+            teamData = teamResponse.data.data || [];
+          } else {
+            // Use mock team data
+            teamData = mockTeamDocuments;
+          }
+        } catch (teamError) {
+          console.error('Error fetching team documents:', teamError);
+          // Fall back to mock team data
+          teamData = mockTeamDocuments;
+        }
+        
+        // Filter out deleted documents from team data
+        const filteredTeamData = teamData.filter(doc => 
+          !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
+        );
+        
+        setTeamDocuments(filteredTeamData);
+      }
     } catch (err) {
-      console.error('Error fetching documents:', err);
+      console.error('Error in document fetching workflow:', err);
       setError('Erreur lors du chargement des documents. Utilisation des données de démonstration.');
       
       // Get deleted document IDs from localStorage
