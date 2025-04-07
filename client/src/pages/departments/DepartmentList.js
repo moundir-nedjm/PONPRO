@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -83,7 +84,7 @@ const DepartmentList = () => {
   const fetchDepartments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/departments');
+      const response = await apiClient.get('/departments');
       if (response.data.success) {
         setDepartments(response.data.data);
         setFilteredDepartments(response.data.data);
@@ -157,7 +158,7 @@ const DepartmentList = () => {
         return;
       }
       
-      const response = await axios.delete(`/api/departments/${selectedDepartment._id}`);
+      const response = await apiClient.delete(`/departments/${selectedDepartment._id}`);
       
       if (response.data.success) {
         // Remove the department from the local state to avoid having to refetch

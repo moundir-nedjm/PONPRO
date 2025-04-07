@@ -42,14 +42,12 @@ const EmployeeSchema = new mongoose.Schema({
     required: true
   },
   department: {
-    name: {
-      type: String,
-      required: true
-    },
-    id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Department'
-    }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+    required: true
+  },
+  departmentName: {
+    type: String
   },
   hireDate: {
     type: Date,

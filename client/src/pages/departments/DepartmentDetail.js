@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -96,11 +97,16 @@ const DepartmentDetail = () => {
   const fetchDepartmentData = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`/api/departments/${id}`);
+      console.log('Fetching department data for ID:', id); // Debug log
+      
+      // Use our centralized API client
+      const res = await apiClient.get(`/departments/${id}`);
+      console.log('Department API response:', res); // Debug log
       setDepartment(res.data.data);
       
       // Fetch employees in this department
-      const empRes = await axios.get(`/api/employees?department=${id}`);
+      const empRes = await apiClient.get(`/employees?department=${id}`);
+      console.log('Employees API response:', empRes); // Debug log
       const employeesData = empRes.data.data || [];
       setEmployees(employeesData);
       
@@ -109,8 +115,22 @@ const DepartmentDetail = () => {
       
       setError(null);
     } catch (err) {
-      console.error('Erreur lors du chargement du département:', err);
-      setError('Impossible de charger les détails du département. Veuillez réessayer plus tard.');
+      console.error('Error loading department details:', err);
+      if (err.response) {
+        console.error('Error response data:', err.response.data);
+        console.error('Error response status:', err.response.status);
+        
+        if (err.response.status === 404) {
+          setError('Le département demandé n\'existe pas.');
+        } else {
+          setError(`Impossible de charger les détails du département. ${err.response?.data?.message || 'Veuillez réessayer plus tard.'}`);
+        }
+      } else if (err.request) {
+        console.error('No response received from server');
+        setError('Aucune réponse du serveur. Veuillez vérifier votre connexion Internet.');
+      } else {
+        setError('Impossible de charger les détails du département. Veuillez réessayer plus tard.');
+      }
     } finally {
       setLoading(false);
     }
@@ -208,7 +228,7 @@ const DepartmentDetail = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      await axios.delete(`/api/departments/${id}`);
+      await apiClient.delete(`/departments/${id}`);
       setDeleteDialogOpen(false);
       navigate('/departments');
     } catch (err) {

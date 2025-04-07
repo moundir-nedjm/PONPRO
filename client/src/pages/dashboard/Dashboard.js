@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
+import apiClient from '../../utils/api';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
@@ -59,41 +60,45 @@ const Dashboard = () => {
         const storedDeletedIds = localStorage.getItem('pointgee_deleted_employees');
         const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
         
-        // In a real application, you would fetch this data from your API
-        // For demo purposes, we'll use mock data
-        
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data for all projects
-        const allProjects = [
-          { name: 'KBK FROID', employeeCount: 12 },
-          { name: 'KBK ELEC', employeeCount: 10 },
-          { name: 'HML', employeeCount: 8 },
-          { name: 'REB', employeeCount: 7 },
-          { name: 'DEG', employeeCount: 9 },
-          { name: 'HAMRA', employeeCount: 5 },
-          { name: 'ADM SETIF', employeeCount: 6 },
-          { name: 'ADM HMD', employeeCount: 7 }
-        ];
-        
-        // Check if we have deleted employees and adjust the counts accordingly
-        const deletedCount = deletedIds.length;
-        
-        // We have 5 mock employees in the system (from EmployeeList)
-        const baseEmployeeCount = 5;
-        const remainingEmployees = Math.max(0, baseEmployeeCount - deletedCount);
-        
-        // Adjust all project employee counts proportionally
-        if (deletedCount > 0) {
-          const reductionFactor = remainingEmployees / baseEmployeeCount;
-          allProjects.forEach(project => {
-            project.employeeCount = Math.max(0, Math.floor(project.employeeCount * reductionFactor));
-          });
+        // Fetch departments from the API
+        let departments = [];
+        try {
+          const response = await apiClient.get('/departments');
+          if (response.data.success) {
+            departments = response.data.data.map(dept => ({
+              name: dept.name,
+              description: dept.description,
+              employeeCount: dept.employeeCount || 0,
+              active: dept.active
+            }));
+            console.log('Fetched departments:', departments);
+          }
+        } catch (err) {
+          console.error('Error fetching departments from API:', err);
+          // Fallback to demo data if API fails
+          departments = [
+            { name: 'KBK FROID', employeeCount: 12 },
+            { name: 'KBK ELEC', employeeCount: 10 },
+            { name: 'HML', employeeCount: 8 },
+            { name: 'REB', employeeCount: 7 },
+            { name: 'DEG', employeeCount: 9 },
+            { name: 'HAMRA', employeeCount: 5 },
+            { name: 'ADM SETIF', employeeCount: 6 },
+            { name: 'ADM HMD', employeeCount: 7 }
+          ];
         }
-
+        
+        // If no departments with employeeCount, generate default counts
+        if (departments.length > 0 && departments.every(d => d.employeeCount === 0)) {
+          const defaultCount = Math.floor(64 / departments.length);
+          departments = departments.map(dept => ({
+            ...dept,
+            employeeCount: defaultCount
+          }));
+        }
+        
         // Calculate total from projects
-        const allEmployees = allProjects.reduce((sum, project) => sum + project.employeeCount, 0);
+        const allEmployees = departments.reduce((sum, project) => sum + project.employeeCount, 0);
         
         // Scale attendance numbers based on employee count
         const attendanceRatio = allEmployees / 64; // Original demo had 64 employees
@@ -102,7 +107,7 @@ const Dashboard = () => {
         const allLate = Math.round(6 * attendanceRatio);
         
         // Filter data based on user role
-        let filteredProjects = allProjects;
+        let filteredProjects = departments;
         let totalEmployees = allEmployees;
         let presentToday = allPresent;
         let absentToday = allAbsent;
@@ -110,7 +115,7 @@ const Dashboard = () => {
         
         // If user is a team leader, filter data for their project
         if (currentUser && currentUser.role === 'chef' && currentUser.projects) {
-          filteredProjects = allProjects.filter(project => 
+          filteredProjects = departments.filter(project => 
             currentUser.projects.includes(project.name)
           );
           

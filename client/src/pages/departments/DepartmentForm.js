@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -47,7 +48,7 @@ const DepartmentForm = () => {
       
       try {
         setLoading(true);
-        const res = await axios.get(`/api/departments/${id}`);
+        const res = await apiClient.get(`/departments/${id}`);
         setDepartment(res.data.data);
         setError(null);
       } catch (err) {
@@ -72,9 +73,9 @@ const DepartmentForm = () => {
       setSubmitError(null);
       
       if (isEditMode) {
-        await axios.put(`/api/departments/${id}`, values);
+        await apiClient.put(`/departments/${id}`, values);
       } else {
-        await axios.post('/api/departments', values);
+        await apiClient.post('/departments', values);
       }
       
       navigate('/departments');
