@@ -138,7 +138,8 @@ const AttendanceMonthlySheet = () => {
     handleMonthChange,
     getAttendanceCode,
     getDepartmentName,
-    updateAttendanceCode
+    updateAttendanceCode,
+    fetchAttendanceData
   } = useAttendance();
 
   // Local state for UI components
@@ -263,6 +264,11 @@ const AttendanceMonthlySheet = () => {
 
   const totals = calculateTotals();
 
+  // Add a retry handler
+  const handleRetry = () => {
+    fetchAttendanceData();
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ p: 2 }}>
@@ -347,7 +353,15 @@ const AttendanceMonthlySheet = () => {
       </Paper>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert 
+          severity="error" 
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={handleRetry}>
+              Réessayer
+            </Button>
+          }
+        >
           {error}
         </Alert>
       )}

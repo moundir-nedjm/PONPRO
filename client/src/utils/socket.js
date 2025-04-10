@@ -1,21 +1,26 @@
-import { io } from 'socket.io-client';
+import io from 'socket.io-client';
 
-// Create a singleton socket instance
-const socket = io('http://localhost:5000', {
-  autoConnect: false, // We'll connect manually when needed
-  reconnectionAttempts: 5,
-  timeout: 10000
-});
+// Socket.IO server URL - should be the same as your backend API
+const SOCKET_URL = 'http://localhost:5002';
 
-// Socket event names
+// Socket events
 export const SOCKET_EVENTS = {
   EMPLOYEE_CREATED: 'employee-created',
   EMPLOYEE_UPDATED: 'employee-updated',
   EMPLOYEE_DELETED: 'employee-deleted',
-  BIOMETRIC_STATUS_UPDATED: 'employee-biometric-updated',
-  BIOMETRIC_VALIDATED: 'employee-biometric-validated',
-  BIOMETRIC_SCAN_COMPLETED: 'biometric-scan-completed'
+  BIOMETRIC_STATUS_UPDATED: 'biometric-status-updated',
+  BIOMETRIC_VALIDATED: 'biometric-validated',
+  BIOMETRIC_SCAN_COMPLETED: 'biometric-scan-completed',
+  ATTENDANCE_RECORDED: 'attendance-recorded',
+  ATTENDANCE_UPDATED: 'attendance-updated'
 };
+
+// Create a singleton socket instance
+const socket = io(SOCKET_URL, {
+  autoConnect: false, // We'll connect manually when needed
+  reconnectionAttempts: 5,
+  timeout: 10000
+});
 
 /**
  * Socket utility for managing the connection and event handling
@@ -27,7 +32,7 @@ const SocketService = {
   connect: () => {
     if (!socket.connected) {
       socket.connect();
-      console.log('Socket connection initiated');
+      console.log('Socket.IO: Attempting connection...');
     }
   },
 
@@ -37,7 +42,7 @@ const SocketService = {
   disconnect: () => {
     if (socket.connected) {
       socket.disconnect();
-      console.log('Socket disconnected');
+      console.log('Socket.IO: Disconnected');
     }
   },
 

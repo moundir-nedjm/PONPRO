@@ -1,316 +1,429 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  CircularProgress, 
-  Paper, 
-  Typography, 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Alert,
-  IconButton
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+  Typography,
+  CircularProgress,
+  Grid,
+  IconButton,
+  Alert
 } from '@mui/material';
-import { 
-  CameraAlt as CameraIcon, 
-  Close as CloseIcon,
-  Check as CheckIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
-import axios from 'axios';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import * as faceapi from 'face-api.js';
+import apiClient from '../../utils/apiClient';
+
+const MODELS_URL = '/models';
 
 const FaceScanner = ({ 
   open, 
   onClose, 
   onSuccess, 
-  mode, 
-  employeeId = null,
-  title = 'Scanner de Visage' 
+  mode = 'register', // 'register' or 'recognize'
+  employeeId,
+  employeeName
 }) => {
-  const [stream, setStream] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const videoRef = useRef();
+  const canvasRef = useRef();
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isReady, setIsReady] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [capturedImage, setCapturedImage] = useState(null);
-  const [scanResult, setScanResult] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [detectionResult, setDetectionResult] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [stream, setStream] = useState(null);
 
-  // Start camera when dialog opens
+  // Load models and initialize camera
   useEffect(() => {
     if (open) {
-      startCamera();
-    } else {
-      stopCamera();
-      setCapturedImage(null);
-      setScanResult(null);
-      setError(null);
+      loadModels();
     }
+    
+    // Cleanup on component unmount or when dialog closes
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      setCapturedImage(null);
+      setDetectionResult(null);
+      setErrorMessage('');
+      setSuccessMessage('');
+      setIsReady(false);
+      setIsCapturing(false);
+      setIsProcessing(false);
+    };
   }, [open]);
 
+  // Load face-api.js models
+  const loadModels = async () => {
+    setIsInitializing(true);
+    setErrorMessage('');
+    
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL),
+        faceapi.nets.faceExpressionNet.loadFromUri(MODELS_URL),
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODELS_URL)
+      ]);
+      
+      console.log('Face API models loaded successfully');
+      startCamera();
+    } catch (error) {
+      console.error('Error loading face-api models:', error);
+      setErrorMessage('Erreur lors du chargement des modèles de reconnaissance faciale.');
+      setIsInitializing(false);
+    }
+  };
+
+  // Start camera feed
   const startCamera = async () => {
-    setLoading(true);
-    setError(null);
-    
     try {
-      console.log('Starting camera...');
-      // Request camera access
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'user', // Front camera
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        } 
-      });
-      
-      setStream(mediaStream);
-      console.log('Camera started successfully');
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (err) {
-      console.error('Error starting camera:', err);
-      setError('Impossible d\'accéder à la caméra. Veuillez vérifier les permissions.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  };
-
-  const captureImage = () => {
-    if (!videoRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    // Draw video frame on canvas
-    const context = canvas.getContext('2d');
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Convert canvas to image data URL
-    const imageDataUrl = canvas.toDataURL('image/jpeg');
-    setCapturedImage(imageDataUrl);
-  };
-
-  const processFaceScan = async () => {
-    if (!capturedImage) return;
-    
-    setProcessing(true);
-    setError(null);
-    
-    try {
-      console.log('Processing face scan...');
-      // Convert base64 image to blob for upload
-      const base64Response = await fetch(capturedImage);
-      const blob = await base64Response.blob();
-      
-      // Create form data
-      const formData = new FormData();
-      formData.append('image', blob, 'face-scan.jpg');
-      
-      if (employeeId) {
-        formData.append('employeeId', employeeId);
-      }
-      
-      // Send to server for face recognition
-      const endpoint = mode === 'checkIn' 
-        ? '/api/attendance/face-check-in' 
-        : '/api/attendance/face-check-out';
-      
-      console.log(`Sending request to ${endpoint}`);
-      const response = await axios.post(endpoint, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
+      const currentStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: 640,
+          height: 480,
+          facingMode: 'user'
         }
       });
       
-      console.log('Face scan response:', response.data);
-      setScanResult({
-        success: true,
-        employee: response.data.data
-      });
+      setStream(currentStream);
       
-      // Notify parent component of success
-      onSuccess(response.data.data);
-    } catch (err) {
-      console.error('Face scan error:', err);
-      
-      // For demo purposes, create a mock successful response
-      const mockEmployee = {
-        _id: 'mock-employee-1',
-        firstName: 'Mohammed',
-        lastName: 'Benali',
-        position: 'Ingénieur'
-      };
-      
-      console.log('Using mock employee data for demo:', mockEmployee);
-      setScanResult({
-        success: true,
-        employee: mockEmployee
-      });
-      
-      // Notify parent component with mock data
-      onSuccess(mockEmployee);
-      
-      // Don't set error for demo
-      // setError(err.response?.data?.error || 'Erreur lors de la reconnaissance faciale');
-    } finally {
-      setProcessing(false);
+      if (videoRef.current) {
+        videoRef.current.srcObject = currentStream;
+        videoRef.current.onloadedmetadata = () => {
+          setIsInitializing(false);
+          setIsReady(true);
+        };
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setErrorMessage('Erreur lors de l\'accès à la caméra. Veuillez vérifier les permissions.');
+      setIsInitializing(false);
     }
   };
 
-  const resetCapture = () => {
-    setCapturedImage(null);
-    setScanResult(null);
-    setError(null);
+  // Capture image from camera
+  const captureImage = () => {
+    if (!isReady || !videoRef.current) return;
+    
+    setIsCapturing(true);
+    
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const context = canvas.getContext('2d');
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const imageDataUrl = canvas.toDataURL('image/jpeg');
+    setCapturedImage(imageDataUrl);
+    
+    // Process the captured image
+    processImage(canvas);
   };
 
+  // Process captured image for face detection
+  const processImage = async (canvas) => {
+    setIsProcessing(true);
+    setErrorMessage('');
+    
+    try {
+      // Get face detections from the captured image
+      const detections = await faceapi.detectAllFaces(canvas, 
+        new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+      
+      if (detections.length === 0) {
+        setErrorMessage('Aucun visage détecté. Veuillez réessayer.');
+        setCapturedImage(null);
+        setIsCapturing(false);
+        setIsProcessing(false);
+        return;
+      }
+      
+      if (detections.length > 1) {
+        setErrorMessage('Plusieurs visages détectés. Veuillez vous assurer qu\'il n\'y a qu\'un seul visage dans le cadre.');
+        setCapturedImage(null);
+        setIsCapturing(false);
+        setIsProcessing(false);
+        return;
+      }
+      
+      // We have one face, proceed with registration or recognition
+      const detection = detections[0];
+      setDetectionResult(detection);
+      
+      // Convert descriptor to array for storage
+      const descriptor = Array.from(detection.descriptor);
+      
+      if (mode === 'register') {
+        // Register the face
+        await registerFace(descriptor);
+      } else {
+        // Recognize the face
+        await recognizeFace(descriptor);
+      }
+    } catch (error) {
+      console.error('Error processing image:', error);
+      setErrorMessage('Erreur lors du traitement de l\'image.');
+      setIsCapturing(false);
+      setIsProcessing(false);
+    }
+  };
+
+  // Register a face for an employee
+  const registerFace = async (descriptor) => {
+    try {
+      const response = await apiClient.post('/biometric/register-face', {
+        employeeId,
+        faceData: descriptor
+      });
+      
+      if (response.data.success) {
+        setSuccessMessage('Visage enregistré avec succès!');
+        
+        // Call onSuccess prop with the result
+        setTimeout(() => {
+          onSuccess && onSuccess({
+            employeeId,
+            faceData: descriptor,
+            timestamp: new Date().toISOString()
+          });
+        }, 2000);
+      } else {
+        throw new Error(response.data.message || 'Échec de l\'enregistrement');
+      }
+    } catch (error) {
+      console.error('Error registering face:', error);
+      setErrorMessage(error.message || 'Erreur lors de l\'enregistrement du visage.');
+    } finally {
+      setIsCapturing(false);
+      setIsProcessing(false);
+    }
+  };
+
+  // Recognize a face
+  const recognizeFace = async (descriptor) => {
+    try {
+      const response = await apiClient.post('/biometric/recognize-face', {
+        faceData: descriptor
+      });
+      
+      if (response.data.success && response.data.match) {
+        setSuccessMessage(`Visage reconnu: ${response.data.employee.firstName} ${response.data.employee.lastName}`);
+        
+        // Call onSuccess prop with the result
+        setTimeout(() => {
+          onSuccess && onSuccess({
+            employeeId: response.data.employee._id,
+            name: `${response.data.employee.firstName} ${response.data.employee.lastName}`,
+            timestamp: new Date().toISOString()
+          });
+        }, 2000);
+      } else {
+        throw new Error(response.data.message || 'Visage non reconnu');
+      }
+    } catch (error) {
+      console.error('Error recognizing face:', error);
+      setErrorMessage(error.message || 'Erreur lors de la reconnaissance faciale.');
+    } finally {
+      setIsCapturing(false);
+      setIsProcessing(false);
+    }
+  };
+
+  // Reset the component state to try again
+  const handleRetry = () => {
+    setCapturedImage(null);
+    setDetectionResult(null);
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsCapturing(false);
+    setIsProcessing(false);
+  };
+
+  // Dialog title based on mode
+  const dialogTitle = mode === 'register' 
+    ? 'Enregistrement du visage' 
+    : 'Reconnaissance faciale';
+
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
+    <Dialog
+      open={open}
+      onClose={isProcessing ? null : onClose}
+      maxWidth="md"
       fullWidth
     >
       <DialogTitle>
-        {title}
-        <IconButton
-          aria-label="close"
-          onClick={onClose}
-          sx={{
-            position: 'absolute',
-            right: 8,
-            top: 8,
-            color: (theme) => theme.palette.grey[500],
-          }}
-        >
-          <CloseIcon />
-        </IconButton>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Typography variant="h6">{dialogTitle}</Typography>
+          {!isProcessing && (
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          )}
+        </Box>
       </DialogTitle>
       
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          {error && (
-            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          
-          {scanResult && scanResult.success && (
-            <Alert severity="success" sx={{ width: '100%', mb: 2 }}>
-              {mode === 'checkIn' 
-                ? 'Pointage d\'entrée réussi !' 
-                : 'Pointage de sortie réussi !'}
-              <Typography variant="body2">
-                Employé: {scanResult.employee.firstName} {scanResult.employee.lastName}
-              </Typography>
-            </Alert>
-          )}
-          
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              {!capturedImage ? (
-                <Paper 
-                  elevation={3} 
-                  sx={{ 
-                    width: '100%', 
-                    height: 'auto', 
-                    aspectRatio: '4/3',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    bgcolor: 'black'
-                  }}
+        {isInitializing ? (
+          <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={4}>
+            <CircularProgress />
+            <Typography variant="body1" style={{ marginTop: 16 }}>
+              Initialisation de la caméra...
+            </Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={2}>
+            {employeeName && mode === 'register' && (
+              <Grid item xs={12}>
+                <Alert severity="info">
+                  Enregistrement du visage pour: {employeeName}
+                </Alert>
+              </Grid>
+            )}
+            
+            {errorMessage && (
+              <Grid item xs={12}>
+                <Alert severity="error">{errorMessage}</Alert>
+              </Grid>
+            )}
+            
+            {successMessage && (
+              <Grid item xs={12}>
+                <Alert 
+                  severity="success"
+                  icon={<CheckCircleIcon fontSize="inherit" />}
                 >
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  {successMessage}
+                </Alert>
+              </Grid>
+            )}
+            
+            <Grid item xs={12} className="face-scanner-container">
+              <Box
+                position="relative"
+                sx={{
+                  width: '100%',
+                  height: 'auto',
+                  maxWidth: 640,
+                  maxHeight: 480,
+                  margin: '0 auto',
+                  border: '1px solid #ccc',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  bgcolor: 'black'
+                }}
+              >
+                {!capturedImage ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: isReady ? 'block' : 'none'
+                      }}
+                    />
+                    <canvas
+                      ref={canvasRef}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%'
+                      }}
+                    />
+                    
+                    {!isReady && !errorMessage && (
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        height="100%"
+                        minHeight={300}
+                      >
+                        <CircularProgress />
+                      </Box>
+                    )}
+                  </>
+                ) : (
+                  <img
+                    src={capturedImage}
+                    alt="Captured face"
+                    style={{
+                      width: '100%',
+                      height: 'auto'
+                    }}
                   />
-                </Paper>
-              ) : (
-                <Paper 
-                  elevation={3} 
-                  sx={{ 
-                    width: '100%',
-                    height: 'auto',
-                    aspectRatio: '4/3',
-                    overflow: 'hidden',
-                    position: 'relative'
-                  }}
+                )}
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} sx={{ textAlign: 'center', mt: 2 }}>
+              {!capturedImage && isReady && !errorMessage && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={isCapturing || isProcessing}
+                  onClick={captureImage}
+                  startIcon={<CameraAltIcon />}
+                  sx={{ px: 4, py: 1.5 }}
                 >
-                  <img 
-                    src={capturedImage} 
-                    alt="Captured face" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </Paper>
+                  {isCapturing ? 'Capture...' : 'Capturer'}
+                </Button>
               )}
               
-              <canvas 
-                ref={canvasRef} 
-                style={{ display: 'none' }} 
-              />
-            </>
-          )}
-        </Box>
+              {capturedImage && (
+                <Box mt={2}>
+                  {isProcessing ? (
+                    <Box display="flex" flexDirection="column" alignItems="center">
+                      <CircularProgress size={24} />
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        {mode === 'register' ? 'Enregistrement...' : 'Reconnaissance...'}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    errorMessage && (
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={handleRetry}
+                        sx={{ mt: 1 }}
+                      >
+                        Réessayer
+                      </Button>
+                    )
+                  )}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        )}
       </DialogContent>
       
-      <DialogActions sx={{ justifyContent: 'center', p: 2 }}>
-        {!capturedImage ? (
-          <Button 
-            variant="contained" 
-            color="primary" 
-            onClick={captureImage}
-            startIcon={<CameraIcon />}
-            disabled={loading || !stream}
-            fullWidth
-          >
-            Capturer
-          </Button>
-        ) : (
-          <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-            <Button 
-              variant="outlined" 
-              color="secondary" 
-              onClick={resetCapture}
-              startIcon={<RefreshIcon />}
-              disabled={processing}
-              sx={{ flex: 1 }}
-            >
-              Reprendre
-            </Button>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              onClick={processFaceScan}
-              startIcon={<CheckIcon />}
-              disabled={processing}
-              sx={{ flex: 1 }}
-            >
-              {processing ? <CircularProgress size={24} /> : 'Confirmer'}
-            </Button>
-          </Box>
-        )}
+      <DialogActions>
+        <Button 
+          onClick={onClose}
+          disabled={isProcessing}
+        >
+          Annuler
+        </Button>
       </DialogActions>
     </Dialog>
   );

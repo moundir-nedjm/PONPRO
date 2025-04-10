@@ -365,104 +365,22 @@ exports.getEmployeeAttendance = async (req, res, next) => {
       attendanceRecords = [];
     }
     
-    // If no records found, generate mock data only if USE_MOCK_DATA is true
-    if ((!attendanceRecords || attendanceRecords.length === 0) && process.env.USE_MOCK_DATA === 'true') {
-      console.log('No attendance records found and USE_MOCK_DATA is true, generating mock data');
-      const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-      attendanceRecords = [];
-      
-      // Generate mock attendance for weekdays in the month
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(targetYear, targetMonth, day);
-        const dayOfWeek = date.getDay();
-        
-        // Skip weekends (0 = Sunday, 6 = Saturday)
-        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-        
-        // Random status (mostly present, sometimes absent or late)
-        const statusRandom = Math.random();
-        let status = 'present';
-        let checkIn = null;
-        let checkOut = null;
-        
-        if (statusRandom < 0.8) {
-          // Present
-          status = 'present';
-          
-          // Random check-in time between 8:00 and 9:30
-          const checkInHour = 8 + Math.floor(Math.random() * 1.5);
-          const checkInMinute = Math.floor(Math.random() * 60);
-          checkIn = {
-            time: new Date(targetYear, targetMonth, day, checkInHour, checkInMinute)
-          };
-          
-          // Random check-out time between 16:30 and 18:00
-          const checkOutHour = 16 + Math.floor(Math.random() * 1.5);
-          const checkOutMinute = Math.floor(Math.random() * 60);
-          checkOut = {
-            time: new Date(targetYear, targetMonth, day, checkOutHour, checkOutMinute)
-          };
-        } else if (statusRandom < 0.9) {
-          // Late
-          status = 'late';
-          
-          // Random check-in time between 9:30 and 11:00
-          const checkInHour = 9 + Math.floor(Math.random() * 1.5);
-          const checkInMinute = 30 + Math.floor(Math.random() * 30);
-          checkIn = {
-            time: new Date(targetYear, targetMonth, day, checkInHour, checkInMinute)
-          };
-          
-          // Random check-out time between 17:00 and 18:30
-          const checkOutHour = 17 + Math.floor(Math.random() * 1.5);
-          const checkOutMinute = Math.floor(Math.random() * 60);
-          checkOut = {
-            time: new Date(targetYear, targetMonth, day, checkOutHour, checkOutMinute)
-          };
-        } else {
-          // Absent
-          status = 'absent';
-        }
-        
-        // Calculate work hours if present or late
-        let workHours = null;
-        if (checkIn && checkOut) {
-          workHours = (checkOut.time - checkIn.time) / (1000 * 60 * 60);
-          workHours = Math.round(workHours * 10) / 10; // Round to 1 decimal place
-        }
-        
-        attendanceRecords.push({
-          _id: `mock_${targetYear}${targetMonth}${day}_${req.params.id}`,
-          employee: req.params.id,
-          date: date,
-          checkIn: checkIn,
-          checkOut: checkOut,
-          status: status,
-          workHours: workHours
-        });
-      }
+    // If no records found, return empty array
+    if (!attendanceRecords || attendanceRecords.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
     }
-    
+
     res.status(200).json({
       success: true,
       count: attendanceRecords.length,
       data: attendanceRecords
     });
   } catch (err) {
-    console.error('Error in getEmployeeAttendance:', err);
-    
-    // Check if we should use mock data based on an environment variable
-    if (process.env.USE_MOCK_DATA === 'true') {
-      console.log('Using mock data as specified in environment variables');
-      const mockData = generateMockMonthlyAttendance(req.params.id);
-      return res.status(200).json({
-        success: true,
-        count: mockData.length,
-        data: mockData
-      });
-    }
-    
-    // If it's a real error, return it
+    console.error(`Error fetching monthly attendance for employee ${req.params.id}:`, err);
     return res.status(500).json({
       success: false,
       error: 'Server Error',
@@ -470,88 +388,6 @@ exports.getEmployeeAttendance = async (req, res, next) => {
     });
   }
 };
-
-// Helper function to generate mock monthly attendance
-function generateMockMonthlyAttendance(employeeId) {
-  const currentDate = new Date();
-  const targetMonth = currentDate.getMonth();
-  const targetYear = currentDate.getFullYear();
-  const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-  const attendanceRecords = [];
-  
-  // Generate mock attendance for weekdays in the month
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(targetYear, targetMonth, day);
-    const dayOfWeek = date.getDay();
-    
-    // Skip weekends (0 = Sunday, 6 = Saturday)
-    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-    
-    // Random status (mostly present, sometimes absent or late)
-    const statusRandom = Math.random();
-    let status = 'present';
-    let checkIn = null;
-    let checkOut = null;
-    
-    if (statusRandom < 0.8) {
-      // Present
-      status = 'present';
-      
-      // Random check-in time between 8:00 and 9:30
-      const checkInHour = 8 + Math.floor(Math.random() * 1.5);
-      const checkInMinute = Math.floor(Math.random() * 60);
-      checkIn = {
-        time: new Date(targetYear, targetMonth, day, checkInHour, checkInMinute)
-      };
-      
-      // Random check-out time between 16:30 and 18:00
-      const checkOutHour = 16 + Math.floor(Math.random() * 1.5);
-      const checkOutMinute = Math.floor(Math.random() * 60);
-      checkOut = {
-        time: new Date(targetYear, targetMonth, day, checkOutHour, checkOutMinute)
-      };
-    } else if (statusRandom < 0.9) {
-      // Late
-      status = 'late';
-      
-      // Random check-in time between 9:30 and 11:00
-      const checkInHour = 9 + Math.floor(Math.random() * 1.5);
-      const checkInMinute = 30 + Math.floor(Math.random() * 30);
-      checkIn = {
-        time: new Date(targetYear, targetMonth, day, checkInHour, checkInMinute)
-      };
-      
-      // Random check-out time between 17:00 and 18:30
-      const checkOutHour = 17 + Math.floor(Math.random() * 1.5);
-      const checkOutMinute = Math.floor(Math.random() * 60);
-      checkOut = {
-        time: new Date(targetYear, targetMonth, day, checkOutHour, checkOutMinute)
-      };
-    } else {
-      // Absent
-      status = 'absent';
-    }
-    
-    // Calculate work hours if present or late
-    let workHours = null;
-    if (checkIn && checkOut) {
-      workHours = (checkOut.time - checkIn.time) / (1000 * 60 * 60);
-      workHours = Math.round(workHours * 10) / 10; // Round to 1 decimal place
-    }
-    
-    attendanceRecords.push({
-      _id: `mock_${targetYear}${targetMonth}${day}_${employeeId}`,
-      employee: employeeId,
-      date: date,
-      checkIn: checkIn,
-      checkOut: checkOut,
-      status: status,
-      workHours: workHours
-    });
-  }
-  
-  return attendanceRecords;
-}
 
 // @desc    Get today's attendance summary
 // @route   GET /api/attendance/today

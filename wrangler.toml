@@ -10,13 +10,14 @@ entry-point = "workers-site"
 [build]
 command = "npm run build"
 upload.format = "service-worker"
-
-[build.upload]
-dir = "client/build"
+upload.dir = "client/build"
 
 [env]
 NODE_ENV = "production"
 
-name = "pointage-workers-api"
+compatibility_date = "2023-05-18"
 main = "index.js"
-compatibility_date = "2023-05-18" 
+name = "pointage-workers-api"
+
+# For Pages deployment
+pages_build_output_dir = "client/build" 

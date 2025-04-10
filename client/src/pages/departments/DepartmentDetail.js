@@ -37,7 +37,10 @@ import {
   TableHead,
   TableRow,
   TextField,
-  InputAdornment
+  InputAdornment,
+  useTheme,
+  useMediaQuery,
+  Stack
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -61,9 +64,12 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { useAuth } from '../../context/AuthContext';
 
-const DepartmentDetail = () => {
-  const { id } = useParams();
+const DepartmentDetail = ({ departmentId, isEmbedded }) => {
+  // Get the ID from props if provided, otherwise from URL params
+  const { id: urlId } = useParams();
+  const id = departmentId || urlId;
   const navigate = useNavigate();
   const [department, setDepartment] = useState(null);
   const [employees, setEmployees] = useState([]);
@@ -90,6 +96,13 @@ const DepartmentDetail = () => {
     seniorityDistribution: []
   });
 
+  // Get auth context at component level
+  const { currentUser } = useAuth();
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+
   useEffect(() => {
     fetchDepartmentData();
   }, [id]);
@@ -99,9 +112,27 @@ const DepartmentDetail = () => {
       setLoading(true);
       console.log('Fetching department data for ID:', id); // Debug log
       
+      // Use the currentUser from component scope instead of fetching it inside the function
+      console.log('Current user:', currentUser); // Debug log
+      
       // Use our centralized API client
       const res = await apiClient.get(`/departments/${id}`);
       console.log('Department API response:', res); // Debug log
+      
+      // Check if a chef d'equipe is trying to access a department they're not responsible for
+      if (currentUser?.role === 'chef' && currentUser?.projects) {
+        const departmentData = res.data.data;
+        const userDepartments = currentUser.projects;
+        
+        // Verify this department is in the chef's projects
+        if (!userDepartments.includes(departmentData.name)) {
+          console.error('Chef d\'équipe attempted to access unauthorized department');
+          setError('Vous n\'avez pas accès à ce département.');
+          setLoading(false);
+          return;
+        }
+      }
+      
       setDepartment(res.data.data);
       
       // Fetch employees in this department
@@ -196,21 +227,94 @@ const DepartmentDetail = () => {
     }, 0);
     const averageAge = employeesData.length > 0 ? Math.round(totalAge / employeesData.length) : 0;
     
-    // Mock attendance stats (in a real app, this would come from the API)
-    const attendanceStats = {
-      present: Math.floor(Math.random() * employeesData.length),
-      late: Math.floor(Math.random() * 5),
-      absent: Math.floor(Math.random() * 3),
-      onLeave: Math.floor(Math.random() * 2)
+    // Get real attendance data instead of mock
+    let attendanceStats = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      onLeave: 0
     };
     
+    // Try to fetch real attendance data
+    const fetchAttendanceStats = async () => {
+      try {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
+        const employeeIds = employeesData.map(emp => emp._id).join(',');
+        
+        if (employeeIds.length > 0) {
+          const response = await apiClient.get(`/attendance?date=${today}&employees=${employeeIds}`);
+          
+          if (response.data.success && response.data.data.length > 0) {
+            const attendanceData = response.data.data;
+            
+            // Count different attendance statuses
+            attendanceStats = {
+              present: attendanceData.filter(a => a.status === 'present').length,
+              late: attendanceData.filter(a => a.status === 'late').length,
+              absent: attendanceData.filter(a => a.status === 'absent').length,
+              onLeave: attendanceData.filter(a => a.status === 'on_leave').length
+            };
+            
+            // Set stats with the new attendance data
+            setStats({
+              positionDistribution,
+              genderDistribution,
+              seniorityDistribution,
+              averageSalary,
+              averageAge,
+              attendanceStats
+            });
+            
+            return true;
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error('Error fetching attendance data:', error);
+        return false;
+      }
+    };
+    
+    // Start fetch but don't wait for it
+    fetchAttendanceStats().then(success => {
+      if (!success) {
+        // If real data fetch failed, use mock data (only in development)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Using mock attendance data');
+          attendanceStats = {
+            present: Math.floor(Math.random() * employeesData.length),
+            late: Math.floor(Math.random() * 5),
+            absent: Math.floor(Math.random() * 3),
+            onLeave: Math.floor(Math.random() * 2)
+          };
+        }
+        
+        // Set stats with mock or empty attendance data
+        setStats({
+          positionDistribution,
+          genderDistribution,
+          seniorityDistribution,
+          averageSalary,
+          averageAge,
+          attendanceStats
+        });
+      }
+    });
+    
+    // Set initial stats without waiting for attendance data
     setStats({
       positionDistribution,
       genderDistribution,
       seniorityDistribution,
       averageSalary,
       averageAge,
-      attendanceStats
+      attendanceStats: {
+        present: 0,
+        late: 0,
+        absent: 0,
+        onLeave: 0
+      }
     });
   };
 
@@ -304,79 +408,132 @@ const DepartmentDetail = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Button
-            component={Link}
-            to="/departments"
-            startIcon={<ArrowBackIcon />}
-            sx={{ mr: 2 }}
-          >
-            Retour aux Départements
-          </Button>
-          <Typography variant="h4" component="h1">
-            {department.name}
-          </Typography>
-          <Chip
-            label={department.active ? 'Actif' : 'Inactif'}
-            color={department.active ? 'success' : 'default'}
-            size="small"
-            sx={{ ml: 2 }}
-          />
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      {/* Only show Back button and action buttons if not embedded */}
+      {!isEmbedded && (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between', 
+          alignItems: { xs: 'flex-start', sm: 'center' }, 
+          mb: { xs: 2, sm: 3 },
+          gap: { xs: 1, sm: 0 }
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            mb: { xs: 1, sm: 0 }
+          }}>
+            <Button
+              component={Link}
+              to="/departments"
+              startIcon={<ArrowBackIcon />}
+              sx={{ mr: { xs: 0, sm: 2 }, mb: { xs: 1, sm: 0 }, fontSize: isMobile ? '0.8rem' : 'inherit' }}
+              size={isMobile ? "small" : "medium"}
+            >
+              Retour aux Départements
+            </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant={isMobile ? "h5" : "h4"} component="h1" sx={{ mr: 1 }}>
+                {department.name}
+              </Typography>
+              <Chip
+                label={department.active ? 'Actif' : 'Inactif'}
+                color={department.active ? 'success' : 'default'}
+                size="small"
+              />
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <Button
+              onClick={fetchDepartmentData}
+              startIcon={<RefreshIcon />}
+              size={isMobile ? "small" : "medium"}
+            >
+              Actualiser
+            </Button>
+            <Button
+              component={Link}
+              to={`/departments/edit/${id}`}
+              variant="outlined"
+              color="primary"
+              startIcon={<EditIcon />}
+              size={isMobile ? "small" : "medium"}
+            >
+              Modifier
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleDeleteClick}
+              size={isMobile ? "small" : "medium"}
+            >
+              Supprimer
+            </Button>
+          </Box>
         </Box>
-        <Box>
+      )}
+      
+      {/* Department header - shown in both modes, but styled differently when embedded */}
+      {isEmbedded ? (
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
+              <BusinessIcon />
+            </Avatar>
+            <Box>
+              <Typography variant="h4" component="h1">
+                {department.name}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                <Chip
+                  label={department.active ? 'Actif' : 'Inactif'}
+                  color={department.active ? 'success' : 'default'}
+                  size="small"
+                  sx={{ mr: 1 }}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {department.description}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
           <Button
             onClick={fetchDepartmentData}
             startIcon={<RefreshIcon />}
-            sx={{ mr: 1 }}
+            size={isMobile ? "small" : "medium"}
           >
             Actualiser
           </Button>
-          <Button
-            component={Link}
-            to={`/departments/edit/${id}`}
-            variant="outlined"
-            color="primary"
-            startIcon={<EditIcon />}
-            sx={{ mr: 1 }}
-          >
-            Modifier
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={handleDeleteClick}
-          >
-            Supprimer
-          </Button>
         </Box>
-      </Box>
+      ) : null}
 
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: { xs: 2, sm: 3 } }}>
         <Grid item xs={12} md={4}>
           <Card>
             <CardHeader 
               avatar={
-                <Avatar sx={{ bgcolor: 'primary.main' }}>
-                  <BusinessIcon />
+                <Avatar sx={{ bgcolor: 'primary.main', width: isMobile ? 32 : 40, height: isMobile ? 32 : 40 }}>
+                  <BusinessIcon fontSize={isMobile ? "small" : "medium"} />
                 </Avatar>
               }
               title="Informations du Département"
+              titleTypographyProps={{ variant: isMobile ? 'subtitle1' : 'h6' }}
             />
             <Divider />
-            <CardContent>
-              <Typography variant="body1" color="text.secondary" gutterBottom>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
                 Description
               </Typography>
-              <Typography variant="body1" paragraph>
+              <Typography variant="body1" paragraph sx={{ fontSize: isMobile ? '0.9rem' : 'inherit' }}>
                 {department.description || 'Aucune description fournie.'}
               </Typography>
               
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
                     Statut
                   </Typography>
                   <Chip
@@ -386,21 +543,21 @@ const DepartmentDetail = () => {
                   />
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
                     Employés
                   </Typography>
                   <Chip
-                    icon={<GroupIcon />}
+                    icon={<GroupIcon fontSize="small" />}
                     label={employees.length}
                     color="primary"
                     size="small"
                   />
                 </Grid>
                 <Grid item xs={12}>
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
                     Créé le
                   </Typography>
-                  <Typography variant="body1">
+                  <Typography variant="body2" sx={{ fontSize: isMobile ? '0.9rem' : 'inherit' }}>
                     {new Date(department.createdAt).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'long',
@@ -410,10 +567,10 @@ const DepartmentDetail = () => {
                 </Grid>
                 {department.updatedAt && (
                   <Grid item xs={12}>
-                    <Typography variant="body1" color="text.secondary" gutterBottom>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
                       Dernière mise à jour
                     </Typography>
-                    <Typography variant="body1">
+                    <Typography variant="body2" sx={{ fontSize: isMobile ? '0.9rem' : 'inherit' }}>
                       {new Date(department.updatedAt).toLocaleDateString('fr-FR', {
                         day: 'numeric',
                         month: 'long',
@@ -431,25 +588,26 @@ const DepartmentDetail = () => {
           <Card>
             <CardHeader 
               avatar={
-                <Avatar sx={{ bgcolor: 'primary.main' }}>
-                  <BarChartIcon />
+                <Avatar sx={{ bgcolor: 'primary.main', width: isMobile ? 32 : 40, height: isMobile ? 32 : 40 }}>
+                  <BarChartIcon fontSize={isMobile ? "small" : "medium"} />
                 </Avatar>
               }
               title="Statistiques du Département"
+              titleTypographyProps={{ variant: isMobile ? 'subtitle1' : 'h6' }}
               action={
                 <Tooltip title="Imprimer">
-                  <IconButton onClick={() => window.print()}>
-                    <PrintIcon />
+                  <IconButton onClick={() => window.print()} size={isMobile ? "small" : "medium"}>
+                    <PrintIcon fontSize={isMobile ? "small" : "medium"} />
                   </IconButton>
                 </Tooltip>
               }
             />
             <Divider />
-            <CardContent>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={3}>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
-                    <Typography variant="h4" color="primary.main">
+                    <Typography variant={isMobile ? "h5" : "h4"} color="primary.main">
                       {employees.length}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -457,9 +615,9 @@ const DepartmentDetail = () => {
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
-                    <Typography variant="h4" color="primary.main">
+                    <Typography variant={isMobile ? "h5" : "h4"} color="primary.main">
                       {stats.averageAge || 'N/A'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -467,9 +625,9 @@ const DepartmentDetail = () => {
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
-                    <Typography variant="h4" color="primary.main">
+                    <Typography variant={isMobile ? "h5" : "h4"} color="primary.main">
                       {stats.averageSalary ? `${stats.averageSalary.toLocaleString()} DA` : 'N/A'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -477,9 +635,9 @@ const DepartmentDetail = () => {
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
-                    <Typography variant="h4" color="success.main">
+                    <Typography variant={isMobile ? "h5" : "h4"} color="success.main">
                       {stats.attendanceStats.present}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -490,10 +648,10 @@ const DepartmentDetail = () => {
                 
                 {stats.positionDistribution.length > 0 && (
                   <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1" gutterBottom align="center">
+                    <Typography variant="subtitle2" gutterBottom align="center" sx={{ mt: 1 }}>
                       Distribution des Postes
                     </Typography>
-                    <Box sx={{ height: 250 }}>
+                    <Box sx={{ height: isMobile ? 200 : 250 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -501,8 +659,8 @@ const DepartmentDetail = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
+                            label={({ name, percent }) => isMobile ? `${(percent * 100).toFixed(0)}%` : `${name}: ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={isMobile ? 60 : 80}
                             fill="#8884d8"
                             dataKey="value"
                           >
@@ -511,6 +669,7 @@ const DepartmentDetail = () => {
                             ))}
                           </Pie>
                           <RechartsTooltip />
+                          {!isMobile && <Legend />}
                         </PieChart>
                       </ResponsiveContainer>
                     </Box>
@@ -519,18 +678,23 @@ const DepartmentDetail = () => {
                 
                 {stats.seniorityDistribution.length > 0 && (
                   <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1" gutterBottom align="center">
+                    <Typography variant="subtitle2" gutterBottom align="center" sx={{ mt: 1 }}>
                       Ancienneté des Employés
                     </Typography>
-                    <Box sx={{ height: 250 }}>
+                    <Box sx={{ height: isMobile ? 200 : 250 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={stats.seniorityDistribution}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          margin={{ 
+                            top: 20, 
+                            right: isMobile ? 10 : 30, 
+                            left: isMobile ? 10 : 20, 
+                            bottom: 5 
+                          }}
                         >
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
+                          <XAxis dataKey="name" fontSize={isMobile ? 10 : 12} />
+                          <YAxis fontSize={isMobile ? 10 : 12} />
                           <RechartsTooltip />
                           <Bar dataKey="value" name="Employés" fill="#8884d8" />
                         </BarChart>
@@ -552,20 +716,27 @@ const DepartmentDetail = () => {
           textColor="primary"
           variant="fullWidth"
         >
-          <Tab icon={<GroupIcon />} label="Employés" />
-          <Tab icon={<BarChartIcon />} label="Statistiques" />
+          <Tab icon={<GroupIcon fontSize={isMobile ? "small" : "medium"} />} label="Employés" />
+          <Tab icon={<BarChartIcon fontSize={isMobile ? "small" : "medium"} />} label="Statistiques" />
         </Tabs>
         
         {tabValue === 0 && (
-          <Box sx={{ p: 2 }}>
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ p: { xs: 1, sm: 2 } }}>
+            <Box sx={{ 
+              mb: 2, 
+              display: 'flex', 
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between', 
+              alignItems: { xs: 'stretch', sm: 'center' },
+              gap: 1
+            }}>
               <TextField
                 placeholder="Rechercher des employés..."
                 variant="outlined"
                 size="small"
                 value={searchTerm}
                 onChange={handleSearchChange}
-                sx={{ width: '50%' }}
+                sx={{ width: { xs: '100%', sm: '50%' } }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -574,12 +745,12 @@ const DepartmentDetail = () => {
                   ),
                 }}
               />
-              <Box>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Button
                   variant="outlined"
                   startIcon={<DownloadIcon />}
                   onClick={exportEmployeesToCsv}
-                  sx={{ mr: 1 }}
+                  size={isMobile ? "small" : "medium"}
                 >
                   Exporter
                 </Button>
@@ -589,6 +760,7 @@ const DepartmentDetail = () => {
                   variant="contained"
                   color="primary"
                   startIcon={<AddIcon />}
+                  size={isMobile ? "small" : "medium"}
                 >
                   Ajouter un Employé
                 </Button>
@@ -596,90 +768,179 @@ const DepartmentDetail = () => {
             </Box>
             
             {employees.length > 0 ? (
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Employé</TableCell>
-                      <TableCell>Email</TableCell>
-                      <TableCell>Téléphone</TableCell>
-                      <TableCell>Poste</TableCell>
-                      <TableCell>Date d'embauche</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredEmployees.map((employee) => (
-                      <TableRow key={employee._id}>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar sx={{ mr: 2 }}>
-                              <PersonIcon />
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body1" fontWeight="medium">
-                                {`${employee.firstName} ${employee.lastName}`}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                ID: {employee._id}
-                              </Typography>
-                            </Box>
+              isMobile ? (
+                // Mobile card view for employees
+                <Box>
+                  {filteredEmployees.map((employee) => (
+                    <Card key={employee._id} sx={{ mb: 2 }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                          <Avatar sx={{ mr: 1.5 }}>
+                            <PersonIcon fontSize="small" />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body1" fontWeight="medium">
+                              {`${employee.firstName} ${employee.lastName}`}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              ID: {employee._id}
+                            </Typography>
                           </Box>
-                        </TableCell>
-                        <TableCell>
+                        </Box>
+                        
+                        <Stack spacing={1} sx={{ mb: 1.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <EmailIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                            {employee.email}
+                            <Typography variant="body2" noWrap sx={{ maxWidth: '100%' }}>
+                              {employee.email}
+                            </Typography>
                           </Box>
-                        </TableCell>
-                        <TableCell>
+                          
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <PhoneIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                            {employee.phone || 'N/A'}
+                            <Typography variant="body2">
+                              {employee.phone || 'N/A'}
+                            </Typography>
                           </Box>
-                        </TableCell>
-                        <TableCell>
+                          
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <WorkIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                            {employee.position || 'Non spécifié'}
+                            <Typography variant="body2">
+                              {employee.position || 'Non spécifié'}
+                            </Typography>
                           </Box>
-                        </TableCell>
-                        <TableCell>
+                          
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <EventIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                            {employee.hireDate 
-                              ? new Date(employee.hireDate).toLocaleDateString('fr-FR')
-                              : 'Non spécifié'
-                            }
+                            <Typography variant="body2">
+                              {employee.hireDate 
+                                ? new Date(employee.hireDate).toLocaleDateString('fr-FR')
+                                : 'Non spécifié'
+                              }
+                            </Typography>
                           </Box>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Voir">
-                            <IconButton
-                              component={Link}
-                              to={`/employees/${employee._id}`}
-                              color="primary"
-                              size="small"
-                            >
-                              <VisibilityIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Modifier">
-                            <IconButton
-                              component={Link}
-                              to={`/employees/edit/${employee._id}`}
-                              color="primary"
-                              size="small"
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
+                        </Stack>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <IconButton
+                            component={Link}
+                            to={`/employees/${employee._id}`}
+                            color="primary"
+                            size="small"
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            component={Link}
+                            to={`/employees/edit/${employee._id}`}
+                            color="primary"
+                            size="small"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              ) : (
+                // Table view for tablet/desktop
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Employé</TableCell>
+                        {!isTablet && <TableCell>Email</TableCell>}
+                        {!isTablet && <TableCell>Téléphone</TableCell>}
+                        <TableCell>Poste</TableCell>
+                        <TableCell>Date d'embauche</TableCell>
+                        <TableCell align="right">Actions</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {filteredEmployees.map((employee) => (
+                        <TableRow key={employee._id}>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Avatar sx={{ mr: 2 }}>
+                                <PersonIcon />
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body1" fontWeight="medium">
+                                  {`${employee.firstName} ${employee.lastName}`}
+                                </Typography>
+                                {isTablet && (
+                                  <>
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      {employee.email}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {employee.phone || 'N/A'}
+                                    </Typography>
+                                  </>
+                                )}
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          {!isTablet && (
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <EmailIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                {employee.email}
+                              </Box>
+                            </TableCell>
+                          )}
+                          {!isTablet && (
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <PhoneIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                {employee.phone || 'N/A'}
+                              </Box>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <WorkIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                              {employee.position || 'Non spécifié'}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <EventIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                              {employee.hireDate 
+                                ? new Date(employee.hireDate).toLocaleDateString('fr-FR')
+                                : 'Non spécifié'
+                              }
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Tooltip title="Voir">
+                              <IconButton
+                                component={Link}
+                                to={`/employees/${employee._id}`}
+                                color="primary"
+                                size="small"
+                              >
+                                <VisibilityIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Modifier">
+                              <IconButton
+                                component={Link}
+                                to={`/employees/edit/${employee._id}`}
+                                color="primary"
+                                size="small"
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )
             ) : (
               <Typography variant="body1" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
                 Aucun employé dans ce département.
@@ -689,17 +950,17 @@ const DepartmentDetail = () => {
         )}
         
         {tabValue === 1 && (
-          <Box sx={{ p: 3 }}>
-            <Grid container spacing={3}>
+          <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+            <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <Card>
                   <CardHeader 
                     title="Distribution par Genre" 
-                    titleTypographyProps={{ variant: 'h6' }}
+                    titleTypographyProps={{ variant: isMobile ? 'subtitle1' : 'h6' }}
                   />
                   <Divider />
-                  <CardContent>
-                    <Box sx={{ height: 300 }}>
+                  <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                    <Box sx={{ height: isMobile ? 250 : 300 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -711,8 +972,8 @@ const DepartmentDetail = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
+                            label={({ name, percent }) => isMobile ? `${(percent * 100).toFixed(0)}%` : `${name}: ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={isMobile ? 60 : 80}
                             fill="#8884d8"
                             dataKey="value"
                           >
@@ -733,11 +994,11 @@ const DepartmentDetail = () => {
                 <Card>
                   <CardHeader 
                     title="Présence Aujourd'hui" 
-                    titleTypographyProps={{ variant: 'h6' }}
+                    titleTypographyProps={{ variant: isMobile ? 'subtitle1' : 'h6' }}
                   />
                   <Divider />
-                  <CardContent>
-                    <Box sx={{ height: 300 }}>
+                  <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                    <Box sx={{ height: isMobile ? 250 : 300 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -750,8 +1011,8 @@ const DepartmentDetail = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
+                            label={({ name, percent }) => isMobile ? `${(percent * 100).toFixed(0)}%` : `${name}: ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={isMobile ? 60 : 80}
                             fill="#8884d8"
                             dataKey="value"
                           >

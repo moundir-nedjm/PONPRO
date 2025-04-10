@@ -78,6 +78,7 @@ const AdminBiometricsSettings = () => {
     fingerprintEnrolled: 0,
     totalEmployees: 0
   });
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -96,107 +97,46 @@ const AdminBiometricsSettings = () => {
   const fetchAdminBiometricData = async () => {
     try {
       setLoading(true);
-      setError(null);
+      const res = await axios.get('/api/biometrics/status');
       
-      const response = await axios.get(`/api/employees/${currentUser.id}/biometrics`);
-      setBiometricData(response.data.data);
-      setRequirementsMet(response.data.data.requirementsMet);
-      
-      setLoading(false);
+      if (res.data && res.data.success) {
+        setBiometricData(res.data.data);
+      } else {
+        setBiometricData({
+          faceEnrolled: 0,
+          fingerprintEnrolled: 0,
+          totalEnrolled: 0,
+          enrollmentRate: 0
+        });
+      }
     } catch (err) {
-      console.error('Failed to fetch biometric data:', err);
-      // Instead of showing error, provide mock data
-      console.log('Using mock admin biometric data instead');
-      const mockData = {
-        faceSamples: [],
-        fingerprintSamples: [],
-        qrCode: null,
-        updatedAt: new Date().toISOString()
-      };
-      const mockRequirementsMet = {
-        faceRecognition: false,
-        fingerprint: false
-      };
-      setBiometricData(mockData);
-      setRequirementsMet(mockRequirementsMet);
-      setError(null); // Clear error since we're providing fallback data
+      console.error('Error fetching biometric data:', err);
+      setBiometricData({
+        faceEnrolled: 0,
+        fingerprintEnrolled: 0,
+        totalEnrolled: 0,
+        enrollmentRate: 0
+      });
+    } finally {
       setLoading(false);
     }
   };
   
   const fetchEmployeesData = async () => {
     try {
-      setLoading(true);
+      setLoadingEmployees(true);
+      const res = await axios.get('/api/employees/biometric-status');
       
-      const response = await axios.get('/api/employees');
-      const employeesData = response.data.data || [];
-      
-      // For each employee, fetch their biometric data
-      const employeesWithBiometrics = await Promise.all(
-        employeesData.map(async (employee) => {
-          try {
-            const biometricsResponse = await axios.get(`/api/employees/${employee.id}/biometrics`);
-            return {
-              ...employee,
-              biometrics: biometricsResponse.data.data
-            };
-          } catch (error) {
-            console.log(`Could not fetch biometrics for employee ${employee.id}`, error);
-            return {
-              ...employee,
-              biometrics: { 
-                hasFaceId: false, 
-                hasFingerprint: false, 
-              }
-            };
-          }
-        })
-      );
-      
-      setEmployees(employeesWithBiometrics);
-      
-      // Calculate biometric stats based on actual data
-      const stats = {
-        faceEnrolled: employeesWithBiometrics.filter(emp => emp.biometrics?.hasFaceId).length,
-        fingerprintEnrolled: employeesWithBiometrics.filter(emp => emp.biometrics?.hasFingerprint).length,
-        totalEmployees: employeesWithBiometrics.length
-      };
-      
-      setBiometricStats(stats);
-      setLoading(false);
+      if (res.data && res.data.success) {
+        setEmployees(res.data.data || []);
+      } else {
+        setEmployees([]);
+      }
     } catch (err) {
-      console.error('Failed to fetch employees data:', err);
-      // Instead of showing error, provide mock data
-      console.log('Using mock employees data instead');
-      
-      // Generate mock employees with biometric data
-      const mockEmployees = Array.from({ length: 8 }, (_, i) => ({
-        id: `emp${i+1}`,
-        firstName: `Prénom${i+1}`,
-        lastName: `Nom${i+1}`,
-        email: `employee${i+1}@example.com`,
-        department: {
-          _id: `dept${i % 3 + 1}`,
-          name: ['Administration', 'Production', 'Finance'][i % 3]
-        },
-        biometrics: {
-          hasFaceId: i % 3 === 0, // Every 3rd employee has face ID
-          hasFingerprint: i % 4 === 0, // Every 4th employee has fingerprint
-        }
-      }));
-      
-      setEmployees(mockEmployees);
-      
-      // Generate mock stats based on the mock data
-      const mockStats = {
-        faceEnrolled: mockEmployees.filter(emp => emp.biometrics?.hasFaceId).length,
-        fingerprintEnrolled: mockEmployees.filter(emp => emp.biometrics?.hasFingerprint).length,
-        totalEmployees: mockEmployees.length
-      };
-      
-      setBiometricStats(mockStats);
-      setError(null); // Clear error since we're providing fallback data
-      setLoading(false);
+      console.error('Error fetching employees data:', err);
+      setEmployees([]);
+    } finally {
+      setLoadingEmployees(false);
     }
   };
   

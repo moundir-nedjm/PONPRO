@@ -4,41 +4,28 @@ const asyncHandler = require('../middleware/async');
 
 // @desc    Get all attendance codes
 // @route   GET /api/attendance-codes
-// @access  Private
-exports.getAttendanceCodes = asyncHandler(async (req, res, next) => {
+// @access  Public
+exports.getAttendanceCodes = async (req, res) => {
   try {
-    const attendanceCodes = await AttendanceCode.find().sort({ code: 1 });
+    console.log('Getting attendance codes');
+    const codes = await AttendanceCode.find({ isActive: true }).sort('code');
     
-    if (!attendanceCodes || attendanceCodes.length === 0) {
-      // Generate mock attendance codes if none exist and USE_MOCK_DATA is true
-      if (process.env.USE_MOCK_DATA === 'true') {
-        console.log('No attendance codes found and USE_MOCK_DATA is true, generating mock data');
-        const mockCodes = generateMockAttendanceCodes();
-        
-        return res.status(200).json({
-          success: true,
-          count: mockCodes.length,
-          data: mockCodes
-        });
-      } else {
-        // If no mock data is allowed, just return an empty array
-        return res.status(200).json({
-          success: true,
-          count: 0,
-          data: []
-        });
-      }
-    }
+    console.log(`Found ${codes.length} attendance codes`);
     
     res.status(200).json({
       success: true,
-      count: attendanceCodes.length,
-      data: attendanceCodes
+      count: codes.length,
+      data: codes
     });
   } catch (err) {
-    next(err);
+    console.error('Error fetching attendance codes:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error',
+      message: err.message
+    });
   }
-});
+};
 
 // @desc    Get single attendance code
 // @route   GET /api/attendance-codes/:id
@@ -131,92 +118,4 @@ exports.deleteAttendanceCode = asyncHandler(async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
-
-// Helper function to generate mock attendance codes
-function generateMockAttendanceCodes() {
-  const mockCodes = [
-    {
-      _id: 'ac1',
-      code: 'P',
-      description: 'Présent',
-      color: '#4CAF50',
-      category: 'présence',
-      isActive: true
-    },
-    {
-      _id: 'ac2',
-      code: 'A',
-      description: 'Absent',
-      color: '#F44336',
-      category: 'absence',
-      isActive: true
-    },
-    {
-      _id: 'ac3',
-      code: 'R',
-      description: 'Retard',
-      color: '#FFC107',
-      category: 'présence',
-      isActive: true
-    },
-    {
-      _id: 'ac4',
-      code: 'CP',
-      description: 'Congé Payé',
-      color: '#2196F3',
-      category: 'congé',
-      isActive: true
-    },
-    {
-      _id: 'ac5',
-      code: 'M',
-      description: 'Maladie',
-      color: '#9C27B0',
-      category: 'absence',
-      isActive: true
-    },
-    {
-      _id: 'ac6',
-      code: 'F',
-      description: 'Formation',
-      color: '#009688',
-      category: 'autre',
-      isActive: true
-    },
-    {
-      _id: 'ac7',
-      code: 'T',
-      description: 'Télétravail',
-      color: '#3F51B5',
-      category: 'présence',
-      isActive: true
-    },
-    {
-      _id: 'ac8',
-      code: 'CS',
-      description: 'Congé Sans Solde',
-      color: '#795548',
-      category: 'congé',
-      isActive: true
-    },
-    {
-      _id: 'ac9',
-      code: 'JF',
-      description: 'Jour Férié',
-      color: '#607D8B',
-      category: 'congé',
-      isActive: true
-    },
-    {
-      _id: 'ac10',
-      code: 'MS',
-      description: 'Mission',
-      color: '#FF9800',
-      category: 'présence',
-      isActive: true
-    }
-  ];
-  
-  return mockCodes;
-} 
+}); 

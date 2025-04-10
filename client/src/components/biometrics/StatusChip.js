@@ -18,7 +18,7 @@ import {
  * @param {string} props.size - Size of the chip (small or medium)
  * @param {Object} props.sx - Additional styles to apply to the chip
  */
-const BiometricStatusChip = ({ status, size = 'small', sx = {} }) => {
+const BiometricStatusChip = ({ status = 'not_started', size = 'small', sx = {} }) => {
   let color = 'default';
   let icon = <QuestionMarkIcon />;
   let label = 'Non démarré';
@@ -55,6 +55,10 @@ const BiometricStatusChip = ({ status, size = 'small', sx = {} }) => {
       label = 'En attente';
       break;
     default:
+      // Default to not_started for undefined or unknown status
+      color = 'default';
+      icon = <QuestionMarkIcon />;
+      label = 'Non démarré';
       break;
   }
 

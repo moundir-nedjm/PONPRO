@@ -142,6 +142,7 @@ const menuCategories = {
   main: [
     'Tableau de Bord',
     'Tableau de Bord Personnel',
+    'Tableau de Bord du Département',
     'Mes Statistiques'
   ],
   attendance: [
@@ -188,7 +189,11 @@ const menuItems = [
     title: 'Tableau de Bord',
     path: '/dashboard',
     icon: <DashboardIcon />,
-    roles: ['admin', 'manager', 'user', 'chef']
+    roles: ['admin', 'manager', 'user'],
+    checkRole: (user) => {
+      if (!user) return false;
+      return !(user.name && user.name.startsWith('Adm '));
+    }
   },
   {
     title: 'Employés',
@@ -213,7 +218,21 @@ const menuItems = [
     path: '/employee/dashboard',
     icon: <PersonIcon />,
     roles: ['employee', 'chef'],
+    checkRole: (user) => {
+      if (!user) return false;
+      return user.name && user.name.startsWith('Adm ');
+    },
     description: 'Suivre votre assiduité et présence'
+  },
+  {
+    title: 'Tableau de Bord du Département',
+    path: '/departments/dashboard',
+    icon: <BusinessIcon />,
+    roles: ['chef'],
+    checkRole: (user) => {
+      return user && (user.role === 'chef' || (user.name && user.name.startsWith('Adm ')));
+    },
+    description: 'Visualiser les données du département'
   },
   {
     title: 'Mes Statistiques',

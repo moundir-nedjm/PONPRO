@@ -62,7 +62,7 @@ import {
   Dashboard as DashboardIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
-import axios from 'axios';
+import apiClient from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import DocumentDetails from './DocumentDetails';
 import DocumentHistory from './DocumentHistory';
@@ -139,158 +139,6 @@ const DocumentManagement = () => {
     ],
   };
 
-  // Mock document data with more examples
-  const mockDocuments = [
-    {
-      id: '1',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'national_id',
-      category: 'identity',
-      name: 'Carte Nationale d\'Identité',
-      description: 'Carte d\'identité valide jusqu\'au 12/05/2027',
-      fileUrl: 'https://example.com/document1.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-11-15T10:30:00Z',
-      status: 'verified',
-      shared: false
-    },
-    {
-      id: '2',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'diploma',
-      category: 'education',
-      name: 'Diplôme d\'Ingénieur',
-      description: 'Diplôme d\'ingénieur en informatique',
-      fileUrl: 'https://example.com/document2.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-10-05T14:45:00Z',
-      status: 'verified',
-      shared: true,
-      sharedWithCount: 2,
-      sharedDate: '2023-10-10T09:15:00Z'
-    },
-    {
-      id: '3',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'contract',
-      category: 'professional',
-      name: 'Contrat de Travail',
-      description: 'Contrat de travail CDI',
-      fileUrl: 'https://example.com/document3.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-09-20T09:15:00Z',
-      status: 'pending',
-      shared: false
-    },
-    {
-      id: '4',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'medical_certificate',
-      category: 'health',
-      name: 'Certificat Médical',
-      description: 'Certificat médical d\'aptitude au travail',
-      fileUrl: 'https://example.com/document4.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-08-12T11:20:00Z',
-      status: 'verified',
-      shared: false
-    },
-    {
-      id: '5',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'passport',
-      category: 'identity',
-      name: 'Passeport',
-      description: 'Passeport valide jusqu\'au 05/03/2029',
-      fileUrl: 'https://example.com/document5.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-12-01T15:10:00Z',
-      status: 'pending',
-      shared: false
-    },
-    {
-      id: '6',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'training',
-      category: 'education',
-      name: 'Formation RGPD',
-      description: 'Certificat de formation sur la protection des données',
-      fileUrl: 'https://example.com/document6.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-11-28T13:25:00Z',
-      status: 'verified',
-      shared: true,
-      sharedWithCount: 5,
-      sharedDate: '2023-12-05T10:30:00Z'
-    },
-    {
-      id: '7',
-      userId: currentUser.id,
-      userName: currentUser.name,
-      type: 'vaccination',
-      category: 'health',
-      name: 'Carnet de Vaccination',
-      description: 'Certificat de vaccination COVID-19',
-      fileUrl: 'https://example.com/document7.jpg',
-      mimeType: 'image/jpeg',
-      uploadDate: '2023-07-15T09:45:00Z',
-      status: 'rejected',
-      shared: false
-    }
-  ];
-  
-  // Mock team documents for chef
-  const mockTeamDocuments = [
-    {
-      id: '101',
-      userId: 'user123',
-      userName: 'Jean Dupont',
-      type: 'national_id',
-      category: 'identity',
-      name: 'Carte Nationale d\'Identité',
-      description: 'Carte d\'identité valide jusqu\'au 03/12/2028',
-      fileUrl: 'https://example.com/document101.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-11-10T14:30:00Z',
-      status: 'pending',
-      shared: false
-    },
-    {
-      id: '102',
-      userId: 'user456',
-      userName: 'Sophie Martin',
-      type: 'diploma',
-      category: 'education',
-      name: 'Diplôme de Master',
-      description: 'Master en gestion de projet',
-      fileUrl: 'https://example.com/document102.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-10-22T11:45:00Z',
-      status: 'pending',
-      shared: false
-    },
-    {
-      id: '103',
-      userId: 'user789',
-      userName: 'Pierre Laurent',
-      type: 'medical_certificate',
-      category: 'health',
-      name: 'Certificat Médical',
-      description: 'Certificat médical annuel',
-      fileUrl: 'https://example.com/document103.pdf',
-      mimeType: 'application/pdf',
-      uploadDate: '2023-12-05T09:20:00Z',
-      status: 'pending',
-      shared: false
-    }
-  ];
-
   useEffect(() => {
     // Load deleted document IDs from localStorage
     const storedDeletedIds = localStorage.getItem('deletedDocumentIds');
@@ -299,7 +147,9 @@ const DocumentManagement = () => {
     }
     
     fetchDocuments();
-    fetchTeamMembers();
+    if (isAdmin || isChef) {
+      fetchTeamDocuments();
+    }
   }, [currentUser]);
   
   useEffect(() => {
@@ -312,76 +162,58 @@ const DocumentManagement = () => {
     setError(null);
     
     try {
-      // Get authentication token
-      const token = localStorage.getItem('authToken');
+      console.log('Attempting to fetch documents...');
       
       // Get deleted document IDs from localStorage
       const storedDeletedIds = localStorage.getItem('deletedDocumentIds');
       const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
       
-      let documentData = [];
+      const response = await apiClient.get('/documents');
       
-      // Try to fetch documents from API
-      try {
-        const response = await axios.get('/api/documents', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+      if (response.data && response.data.success) {
+        const documentData = response.data.data || [];
+        console.log('Successfully fetched documents from API:', documentData.length);
         
-        if (response.data && response.data.success) {
-          documentData = response.data.data || [];
-          console.log('Successfully fetched documents from API:', documentData.length);
-        } else {
-          console.log('API returned no documents or invalid format, using fallback data');
-          throw new Error('Invalid API response format');
-        }
-      } catch (apiError) {
-        console.error('API error details:', apiError);
+        // Filter out deleted documents
+        const filteredData = documentData.filter(doc => 
+          !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
+        );
         
-        // If API call failed, use mock data but don't show error message if it's just 
-        // because the API isn't available in development environment
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Using mock data in development environment');
-        } else {
-          // In production, show the error message
-          setError('Erreur lors du chargement des documents. Utilisation des données de démonstration.');
-        }
-        
-        // Use mock data as fallback
-        documentData = mockDocuments;
+        setDocuments(filteredData);
+        setFilteredDocuments(filteredData);
+      } else {
+        console.error('API returned invalid format:', response.data);
+        setError('Erreur lors du chargement des documents: Format de réponse invalide');
+        setDocuments([]);
+        setFilteredDocuments([]);
       }
+    } catch (err) {
+      console.error('Error in document fetching:', err);
+      const errorDetails = err.response ? 
+        `${err.response.status} - ${err.response.statusText}` : 
+        (err.message || 'Erreur inconnue');
       
-      // Filter out deleted documents
-      const filteredData = documentData.filter(doc => 
-        !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
-      );
+      setError(`Erreur lors du chargement des documents: ${errorDetails}`);
+      setDocuments([]);
+      setFilteredDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Get team documents if admin or chef
+  const fetchTeamDocuments = async () => {
+    if (!isAdmin && !isChef) return;
+    
+    try {
+      const response = await apiClient.get('/documents/team');
       
-      setDocuments(filteredData);
-      setFilteredDocuments(filteredData);
-      
-      // If admin or chef, also fetch team documents
-      if (isAdmin || isChef) {
-        let teamData = [];
+      if (response.data && response.data.success) {
+        const teamData = response.data.data || [];
         
-        try {
-          const teamResponse = await axios.get('/api/documents/team', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (teamResponse.data && teamResponse.data.success) {
-            teamData = teamResponse.data.data || [];
-          } else {
-            // Use mock team data
-            teamData = mockTeamDocuments;
-          }
-        } catch (teamError) {
-          console.error('Error fetching team documents:', teamError);
-          // Fall back to mock team data
-          teamData = mockTeamDocuments;
-        }
+        // Get deleted document IDs from localStorage
+        const storedDeletedIds = localStorage.getItem('deletedDocumentIds');
+        const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
         
         // Filter out deleted documents from team data
         const filteredTeamData = teamData.filter(doc => 
@@ -389,67 +221,13 @@ const DocumentManagement = () => {
         );
         
         setTeamDocuments(filteredTeamData);
+      } else {
+        console.error('API returned invalid format for team documents:', response.data);
+        setTeamDocuments([]);
       }
     } catch (err) {
-      console.error('Error in document fetching workflow:', err);
-      setError('Erreur lors du chargement des documents. Utilisation des données de démonstration.');
-      
-      // Get deleted document IDs from localStorage
-      const storedDeletedIds = localStorage.getItem('deletedDocumentIds');
-      const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
-      
-      // Fall back to mock data and filter out deleted documents
-      const filteredMockData = mockDocuments.filter(doc => 
-        !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
-      );
-      
-      setDocuments(filteredMockData);
-      setFilteredDocuments(filteredMockData);
-      
-      if (isAdmin || isChef) {
-        // Also filter team documents
-        const filteredTeamData = mockTeamDocuments.filter(doc => 
-          !deletedIds.includes(doc.id) && !deletedIds.includes(doc._id)
-        );
-        setTeamDocuments(filteredTeamData);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Get team members if admin or chef
-  const fetchTeamMembers = async () => {
-    if (!isAdmin && !isChef) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        // If no token, use mock data
-        console.log('No authentication token found, using mock team data');
-        setTeamDocuments(mockTeamDocuments);
-        return;
-      }
-      
-      const response = await fetch('/api/documents/team/members', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch team members: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      setTeamDocuments(data);
-    } catch (err) {
-      console.error('Error fetching team members:', err);
-      // Fall back to mock data
-      setTeamDocuments(mockTeamDocuments);
+      console.error('Error fetching team documents:', err);
+      setTeamDocuments([]);
     }
   };
 
@@ -621,27 +399,22 @@ const DocumentManagement = () => {
   
   const handleStatusChange = async (documentId, newStatus) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ status: newStatus })
+      const response = await apiClient.patch(`/documents/${documentId}/status`, { 
+        status: newStatus 
       });
       
-      if (!response.ok) {
+      if (response.data && response.data.success) {
+        const updatedDocument = response.data.data;
+        
+        // Update document in state
+        setDocuments(documents.map(doc => 
+          doc._id === documentId || doc.id === documentId ? updatedDocument : doc
+        ));
+        
+        setSuccess(`Status du document mis à jour: ${newStatus}`);
+      } else {
         throw new Error('Failed to update document status');
       }
-      
-      const updatedDocument = await response.json();
-      
-      // Update document in state
-      setDocuments(documents.map(doc => 
-        doc._id === documentId || doc.id === documentId ? updatedDocument : doc
-      ));
-      
-      setSuccess(`Status du document mis à jour: ${newStatus}`);
     } catch (err) {
       console.error('Error updating document status:', err);
       setError('Erreur lors de la mise à jour du statut du document');
@@ -651,39 +424,6 @@ const DocumentManagement = () => {
   const handleUploadDocument = async (documentData) => {
     try {
       setIsUploading(true);
-      
-      // Check if mock mode (no API)
-      const token = localStorage.getItem('token');
-      if (!token) {
-        // Simulate successful upload with mock data
-        console.log('Mocking document upload:', documentData);
-        
-        // Create a mock document
-        const newDocument = {
-          id: `mock-${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          category: documentData.category,
-          name: documentData.name,
-          description: documentData.description || '',
-          fileUrl: URL.createObjectURL(documentData.file),
-          mimeType: documentData.file.type,
-          size: documentData.file.size,
-          uploadDate: new Date().toISOString(),
-          status: 'pending',
-          shared: false
-        };
-        
-        // Add to state after a delay to simulate API call
-        setTimeout(() => {
-          setDocuments([newDocument, ...documents]);
-          setSuccess('Document téléchargé avec succès (mode démo)');
-          setUploadDialogOpen(false);
-          setIsUploading(false);
-        }, 1500);
-        
-        return;
-      }
       
       // Create form data for file upload
       const formData = new FormData();
@@ -697,42 +437,40 @@ const DocumentManagement = () => {
         formData.append('userId', documentData.userId);
       }
       
-      const response = await fetch('/api/documents', {
-        method: 'POST',
+      const response = await apiClient.post('/documents', formData, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'multipart/form-data'
         },
-        body: formData
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to upload document: ${response.status} ${response.statusText}`);
+      if (response.data && response.data.success) {
+        // Add new document to state
+        const newDocument = response.data.data;
+        setDocuments([newDocument, ...documents]);
+        setSuccess('Document téléchargé avec succès');
+      } else {
+        throw new Error('Failed to upload document: Invalid response format');
       }
       
-      // Add new document to state
-      const newDocument = await response.json();
-      setDocuments([newDocument, ...documents]);
-      setSuccess('Document téléchargé avec succès');
       setUploadDialogOpen(false);
     } catch (err) {
       console.error('Error uploading document:', err);
       setError('Erreur lors du téléchargement du document. Veuillez réessayer.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
   
   const handleDeleteDocument = async (documentId) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await apiClient.delete(`/documents/${documentId}`);
       
-      if (!response.ok) {
+      if (!response.data || !response.data.success) {
         throw new Error('Failed to delete document');
       }
       

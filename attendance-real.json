@@ -1,0 +1,106 @@
+[
+  {
+    "key": "attendance:1",
+    "value": {
+      "id": "1",
+      "employeeId": "1",
+      "date": "2023-04-07",
+      "status": "present",
+      "checkInTime": "2023-04-07T08:00:00.000Z",
+      "checkOutTime": null,
+      "createdAt": "2023-04-07T08:00:00.000Z",
+      "updatedAt": "2023-04-07T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:2",
+    "value": {
+      "id": "2",
+      "employeeId": "4",
+      "date": "2023-04-07",
+      "status": "present",
+      "checkInTime": "2023-04-07T08:00:00.000Z",
+      "checkOutTime": "2023-04-07T17:00:00.000Z",
+      "createdAt": "2023-04-07T08:00:00.000Z",
+      "updatedAt": "2023-04-07T17:00:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:3",
+    "value": {
+      "id": "3",
+      "employeeId": "7",
+      "date": "2023-04-07",
+      "status": "present",
+      "checkInTime": "2023-04-07T08:00:00.000Z",
+      "checkOutTime": "2023-04-07T17:00:00.000Z",
+      "createdAt": "2023-04-07T08:00:00.000Z",
+      "updatedAt": "2023-04-07T17:00:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:4",
+    "value": {
+      "id": "4",
+      "employeeId": "9",
+      "date": "2023-04-07",
+      "status": "present",
+      "checkInTime": "2023-04-07T08:00:00.000Z",
+      "checkOutTime": "2023-04-07T17:00:00.000Z",
+      "createdAt": "2023-04-07T08:00:00.000Z",
+      "updatedAt": "2023-04-07T17:00:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:5",
+    "value": {
+      "id": "5",
+      "employeeId": "3",
+      "date": "2023-04-07",
+      "status": "absent",
+      "checkInTime": null,
+      "checkOutTime": null,
+      "createdAt": "2023-04-07T00:00:00.000Z",
+      "updatedAt": "2023-04-07T00:00:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:6",
+    "value": {
+      "id": "6",
+      "employeeId": "5",
+      "date": "2023-04-07",
+      "status": "late",
+      "checkInTime": "2023-04-07T08:30:00.000Z",
+      "checkOutTime": null,
+      "createdAt": "2023-04-07T08:30:00.000Z",
+      "updatedAt": "2023-04-07T08:30:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:7",
+    "value": {
+      "id": "7",
+      "employeeId": "6",
+      "date": "2023-04-07",
+      "status": "late",
+      "checkInTime": "2023-04-07T08:45:00.000Z",
+      "checkOutTime": null,
+      "createdAt": "2023-04-07T08:45:00.000Z",
+      "updatedAt": "2023-04-07T08:45:00.000Z"
+    }
+  },
+  {
+    "key": "attendance:8",
+    "value": {
+      "id": "8",
+      "employeeId": "8",
+      "date": "2023-04-07",
+      "status": "absent",
+      "checkInTime": null,
+      "checkOutTime": null,
+      "createdAt": "2023-04-07T00:00:00.000Z",
+      "updatedAt": "2023-04-07T00:00:00.000Z"
+    }
+  }
+] 

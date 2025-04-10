@@ -37,9 +37,11 @@ import {
   Delete as DeleteIcon,
   PersonAdd as PersonAddIcon,
   People as PeopleIcon,
-  FolderShared as FolderSharedIcon
+  FolderShared as FolderSharedIcon,
+  Error as ErrorIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../utils/api';
 
 const SharedDocuments = ({ documents, onDocumentView, onDocumentDownload, onShareDocument }) => {
   const { currentUser } = useAuth();
@@ -48,105 +50,57 @@ const SharedDocuments = ({ documents, onDocumentView, onDocumentDownload, onShar
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [shareMessage, setShareMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [sharedDocuments, setSharedDocuments] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
   
-  // Mock data for shared documents
-  const mockSharedDocuments = [
-    {
-      id: '101',
-      documentId: '1',
-      documentName: 'Carte Nationale d\'Identité',
-      documentType: 'national_id',
-      documentUrl: 'https://example.com/document1.pdf',
-      mimeType: 'application/pdf',
-      sharedBy: {
-        id: 'user2',
-        name: 'Marie Dupont'
-      },
-      sharedWith: {
-        id: currentUser.id,
-        name: currentUser.name
-      },
-      sharedDate: '2023-12-10T09:30:00Z',
-      message: 'Voici ma CNI pour le dossier administratif.'
-    },
-    {
-      id: '102',
-      documentId: '3',
-      documentName: 'Procédure de sécurité',
-      documentType: 'safety_training',
-      documentUrl: 'https://example.com/document5.pdf',
-      mimeType: 'application/pdf',
-      sharedBy: {
-        id: 'user3',
-        name: 'Thomas Martin'
-      },
-      sharedWith: {
-        id: currentUser.id,
-        name: currentUser.name
-      },
-      sharedDate: '2023-12-15T14:45:00Z',
-      message: 'Nouvelles procédures de sécurité à suivre.'
-    }
-  ];
-  
-  // Mock data for users available to share with
-  const mockUsers = [
-    {
-      id: 'user2',
-      name: 'Marie Dupont',
-      email: 'marie.dupont@example.com',
-      role: 'manager'
-    },
-    {
-      id: 'user3',
-      name: 'Thomas Martin',
-      email: 'thomas.martin@example.com',
-      role: 'chef'
-    },
-    {
-      id: 'user4',
-      name: 'Sophie Bernard',
-      email: 'sophie.bernard@example.com',
-      role: 'employee'
-    }
-  ];
-  
   useEffect(() => {
-    // In a real application, this would be an API call
-    // const fetchSharedDocuments = async () => {
-    //   try {
-    //     setLoading(true);
-    //     const response = await axios.get(`/api/users/${currentUser.id}/shared-documents`);
-    //     setSharedDocuments(response.data);
-    //   } catch (error) {
-    //     console.error('Error fetching shared documents:', error);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
-    
-    // const fetchAvailableUsers = async () => {
-    //   try {
-    //     const response = await axios.get('/api/users');
-    //     setAvailableUsers(response.data.filter(user => user.id !== currentUser.id));
-    //   } catch (error) {
-    //     console.error('Error fetching users:', error);
-    //   }
-    // };
-    
-    // fetchSharedDocuments();
-    // fetchAvailableUsers();
-    
-    // For now, we'll use mock data
-    setTimeout(() => {
-      setSharedDocuments(mockSharedDocuments);
-      setAvailableUsers(mockUsers);
-      setLoading(false);
-    }, 1000);
+    fetchSharedDocuments();
+    fetchAvailableUsers();
   }, [currentUser.id]);
+  
+  const fetchSharedDocuments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await apiClient.get(`/users/${currentUser.id}/shared-documents`);
+      
+      if (response.data && response.data.success) {
+        setSharedDocuments(response.data.data || []);
+      } else {
+        console.error('Invalid response format for shared documents:', response.data);
+        setSharedDocuments([]);
+      }
+    } catch (err) {
+      console.error('Error fetching shared documents:', err);
+      setError('Erreur lors du chargement des documents partagés');
+      setSharedDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchAvailableUsers = async () => {
+    try {
+      setError(null);
+      
+      const response = await apiClient.get('/users');
+      
+      if (response.data && response.data.success) {
+        // Filter out the current user
+        setAvailableUsers(response.data.data.filter(user => user.id !== currentUser.id) || []);
+      } else {
+        console.error('Invalid response format for users:', response.data);
+        setAvailableUsers([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available users:', err);
+      setError('Erreur lors du chargement des utilisateurs');
+      setAvailableUsers([]);
+    }
+  };
   
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -170,35 +124,26 @@ const SharedDocuments = ({ documents, onDocumentView, onDocumentDownload, onShar
     
     setLoading(true);
     
-    // In a real application, this would be an API call
-    // try {
-    //   await Promise.all(selectedUsers.map(userId =>
-    //     axios.post('/api/documents/share', {
-    //       documentId: selectedDocument.id,
-    //       userId,
-    //       message: shareMessage
-    //     })
-    //   ));
-    //   
-    //   // If successful
-    //   if (onShareDocument) {
-    //     onShareDocument(selectedDocument.id, selectedUsers, shareMessage);
-    //   }
-    // } catch (error) {
-    //   console.error('Error sharing document:', error);
-    // } finally {
-    //   setLoading(false);
-    //   handleCloseShareDialog();
-    // }
-    
-    // For now, we'll simulate sharing
-    setTimeout(() => {
+    try {
+      await Promise.all(selectedUsers.map(userId =>
+        apiClient.post('/documents/share', {
+          documentId: selectedDocument.id,
+          userId,
+          message: shareMessage
+        })
+      ));
+      
+      // If successful
       if (onShareDocument) {
         onShareDocument(selectedDocument.id, selectedUsers, shareMessage);
       }
+    } catch (err) {
+      console.error('Error sharing document:', err);
+      setError('Erreur lors du partage du document');
+    } finally {
       setLoading(false);
       handleCloseShareDialog();
-    }, 1000);
+    }
   };
   
   const handleUserSelect = (event) => {

@@ -206,6 +206,18 @@ router.post('/api/employees', withJSONBody, safeHandler(async (request) => {
     });
   }
   
+  // Initialize biometric status for new employee
+  employeeData.biometricStatus = {
+    faceRecognition: {
+      status: 'not_started',
+      samplesCount: 0
+    },
+    fingerprint: {
+      status: 'not_started',
+      samplesCount: 0
+    }
+  };
+  
   // Create employee
   const employee = await EmployeeDB.create(employeeData);
   
@@ -236,7 +248,8 @@ router.post('/api/employees', withJSONBody, safeHandler(async (request) => {
         id: employee.id,
         name: employee.name,
         email: employee.email,
-        departmentId: employee.departmentId
+        departmentId: employee.departmentId,
+        biometricStatus: employee.biometricStatus
       }
     }
   };

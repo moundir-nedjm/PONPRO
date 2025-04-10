@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import axios from 'axios';
 import {
   Box,
   Typography,
@@ -33,6 +32,7 @@ import {
   Cancel as CancelIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
+import apiClient from '../../utils/api';
 
 const EmployeeForm = () => {
   const { id } = useParams();
@@ -41,6 +41,7 @@ const EmployeeForm = () => {
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState(null);
   const [departments, setDepartments] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [initialValues, setInitialValues] = useState({
     firstName: '',
     lastName: '',
@@ -65,78 +66,89 @@ const EmployeeForm = () => {
       try {
         setLoading(true);
         
-        // In a real application, you would fetch this data from your API
-        // For now, we'll use mock data
+        // Fetch departments from API
+        const departmentsResponse = await apiClient.get('/departments');
         
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock departments data
-        const mockDepartments = [
-          { id: '1', name: 'Administration' },
-          { id: '2', name: 'Ressources Humaines' },
-          { id: '3', name: 'Finance' },
-          { id: '4', name: 'Informatique' },
-          { id: '5', name: 'Marketing' },
-          { id: '6', name: 'Production' }
-        ];
-        
-        setDepartments(mockDepartments);
+        if (departmentsResponse.data.success) {
+          // Transform departments data to match the format expected by the form
+          const departmentsData = departmentsResponse.data.data.map(dept => ({
+            id: dept._id,
+            name: dept.name
+          }));
+          
+          setDepartments(departmentsData);
+        } else {
+          throw new Error('Failed to fetch departments');
+        }
         
         if (isEditMode) {
-          // Mock employee data for edit mode
-          const mockEmployee = {
-            id: '1',
-            firstName: 'Ahmed',
-            lastName: 'Benali',
-            employeeId: 'EMP001',
-            email: 'ahmed.benali@example.com',
-            phone: '+213 555 123 456',
-            position: 'Développeur Senior',
-            department: '4', // ID of Informatique
-            hireDate: '2020-05-15',
-            birthDate: '1988-10-20',
-            gender: 'male',
-            nationalId: '88102012345',
-            address: {
-              street: '15 Rue des Oliviers',
-              city: 'Alger',
-              wilaya: 'Alger',
-              postalCode: '16000'
-            },
-            active: true
-          };
+          console.log('Edit mode detected, fetching employee with ID:', id);
           
-          setInitialValues({
-            firstName: mockEmployee.firstName,
-            lastName: mockEmployee.lastName,
-            employeeId: mockEmployee.employeeId,
-            email: mockEmployee.email,
-            phone: mockEmployee.phone,
-            position: mockEmployee.position,
-            department: mockEmployee.department,
-            hireDate: new Date(mockEmployee.hireDate),
-            birthDate: new Date(mockEmployee.birthDate),
-            gender: mockEmployee.gender,
-            nationalId: mockEmployee.nationalId,
-            street: mockEmployee.address.street,
-            city: mockEmployee.address.city,
-            wilaya: mockEmployee.address.wilaya,
-            postalCode: mockEmployee.address.postalCode,
-            active: mockEmployee.active
-          });
+          // Fetch employee data for edit mode
+          const employeeResponse = await apiClient.get(`/employees/${id}`);
+          
+          console.log('Employee edit data response:', employeeResponse?.data);
+          
+          if (employeeResponse.data.success) {
+            const employeeData = employeeResponse.data.data;
+            
+            // Ensure we have the correct department ID format
+            let departmentId = employeeData.department;
+            if (typeof departmentId === 'object' && departmentId._id) {
+              departmentId = departmentId._id;
+            }
+            
+            setInitialValues({
+              firstName: employeeData.firstName,
+              lastName: employeeData.lastName,
+              employeeId: employeeData.employeeId,
+              email: employeeData.email,
+              phone: employeeData.phone || '',
+              position: employeeData.position,
+              department: departmentId,
+              hireDate: new Date(employeeData.hireDate),
+              birthDate: employeeData.birthDate ? new Date(employeeData.birthDate) : new Date(1990, 0, 1),
+              gender: employeeData.gender || 'male',
+              nationalId: employeeData.nationalId || '',
+              street: employeeData.address?.street || '',
+              city: employeeData.address?.city || '',
+              wilaya: employeeData.address?.wilaya || '',
+              postalCode: employeeData.address?.postalCode || '',
+              active: employeeData.active
+            });
+          } else {
+            throw new Error('Failed to fetch employee data');
+          }
         }
         
         setLoading(false);
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Erreur lors du chargement des données');
+        setError('Erreur lors du chargement des données. Vérifiez l\'identifiant de l\'employé et réessayez.');
         setLoading(false);
       }
     };
 
     fetchData();
   }, [id, isEditMode]);
+
+  // Limit department options based on user role
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'admin' && currentUser.projects) {
+      // For department heads, limit department choices to their assigned projects
+      const availableDepartments = departments.filter(
+        dept => currentUser.projects.includes(dept.name)
+      );
+      
+      if (availableDepartments.length > 0 && !isEditMode) {
+        // Auto-select the first available department for new employees
+        setInitialValues(prev => ({
+          ...prev,
+          department: availableDepartments[0].id
+        }));
+      }
+    }
+  }, [departments, currentUser, isEditMode]);
 
   const validationSchema = Yup.object({
     firstName: Yup.string()
@@ -181,10 +193,7 @@ const EmployeeForm = () => {
     enableReinitialize: true,
     onSubmit: async (values) => {
       try {
-        // In a real application, you would call your API to save the employee
-        // For now, we'll just log the values and navigate back
-        
-        console.log('Form values:', values);
+        setError(null); // Clear previous errors
         
         // Prepare data for API
         const employeeData = {
@@ -195,6 +204,8 @@ const EmployeeForm = () => {
           phone: values.phone,
           position: values.position,
           department: values.department,
+          // Store the department name for easier filtering
+          departmentName: departments.find(d => d.id === values.department)?.name || '',
           hireDate: values.hireDate,
           birthDate: values.birthDate,
           gender: values.gender,
@@ -208,18 +219,83 @@ const EmployeeForm = () => {
           active: values.active
         };
         
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('Saving employee data:', employeeData);
         
-        // Navigate back to employee list or detail page
+        // Validate essential fields
+        if (!employeeData.department) {
+          throw new Error('Département non sélectionné. Veuillez sélectionner un département valide.');
+        }
+        
+        // Call API endpoint based on edit or create mode
+        let response;
         if (isEditMode) {
-          navigate(`/employees/${id}`);
+          response = await apiClient.put(`/employees/${id}`, employeeData);
         } else {
-          navigate('/employees');
+          response = await apiClient.post('/employees', employeeData);
+        }
+        
+        if (response && response.data.success) {
+          console.log('Employee saved successfully:', response.data);
+          
+          // Navigate back to employee list or detail page
+          if (isEditMode) {
+            navigate(`/employees/${id}`);
+          } else {
+            navigate('/employees');
+          }
+        } else {
+          throw new Error(response?.data?.message || 'Failed to save employee data');
         }
       } catch (err) {
         console.error('Error saving employee:', err);
-        setError('Erreur lors de l\'enregistrement de l\'employé');
+        
+        // Extract error message from the API response if possible
+        let errorMessage = 'Erreur lors de l\'enregistrement de l\'employé';
+        
+        if (err.response && err.response.data) {
+          // More detailed error from API
+          if (err.response.data.message) {
+            errorMessage = err.response.data.message;
+          }
+          
+          // If there are validation errors, list them
+          if (err.response.data.errors) {
+            const validationErrors = Object.entries(err.response.data.errors)
+              .map(([field, message]) => `${field}: ${message}`)
+              .join(', ');
+            
+            errorMessage += ` - ${validationErrors}`;
+          }
+          
+          // Check for missing fields specifically
+          if (err.response.data.message && err.response.data.message.includes('Missing required fields')) {
+            errorMessage = err.response.data.message;
+          }
+          
+          // Check for duplicate key errors
+          if (err.response.data.message && err.response.data.message.includes('Duplicate')) {
+            errorMessage = err.response.data.message;
+            // If we know which field caused the issue
+            if (err.response.data.field) {
+              const fieldLabels = {
+                'email': 'Email',
+                'employeeId': 'ID Employé'
+              };
+              const fieldLabel = fieldLabels[err.response.data.field] || err.response.data.field;
+              errorMessage = `${fieldLabel} déjà utilisé. Veuillez en choisir un autre.`;
+            }
+          }
+        } else if (err.message) {
+          // Use the error object's message
+          errorMessage = err.message;
+        }
+        
+        // If it's a network error (no response)
+        if (err.request && !err.response) {
+          errorMessage = 'Erreur de connexion au serveur. Vérifiez que le serveur est en cours d\'exécution.';
+        }
+        
+        setError(errorMessage);
       }
     }
   });

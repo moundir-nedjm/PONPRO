@@ -48,9 +48,15 @@ import {
   ArrowBack as ArrowBackIcon,
   AccessTime as AccessTimeIcon,
   EventNote as EventNoteIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Face as FaceIcon,
+  Fingerprint as FingerprintIcon,
+  AddAPhoto as AddPhotoIcon,
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../utils/api';
+import FaceScanner from '../../components/attendance/FaceScanner';
 
 // TabPanel component for tabs
 function TabPanel(props) {
@@ -84,115 +90,74 @@ const EmployeeDetail = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [leaveRecords, setLeaveRecords] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [biometricStatus, setBiometricStatus] = useState({
+    faceRecognition: { status: 'not_started', samplesCount: 0 },
+    fingerprint: { status: 'not_started', samplesCount: 0 }
+  });
+  const [openFaceScanner, setOpenFaceScanner] = useState(false);
+  const [biometricSuccess, setBiometricSuccess] = useState(null);
+
+  const fetchEmployeeData = async () => {
+    try {
+      setLoading(true);
+      
+      console.log('Fetching employee with ID:', id);
+      
+      // Fetch employee data from API
+      const employeeRes = await apiClient.get(`/employees/${id}`);
+      
+      console.log('Employee API response:', employeeRes?.data);
+      
+      if (!employeeRes.data || !employeeRes.data.success) {
+        throw new Error('Failed to fetch employee data');
+      }
+      
+      // Set employee data from API response
+      setEmployee(employeeRes.data.data);
+      
+      // Set biometric status if available in the employee data
+      if (employeeRes.data.data.biometricStatus) {
+        setBiometricStatus(employeeRes.data.data.biometricStatus);
+      }
+      
+      // Fetch attendance records and leave records
+      const fetchAttendanceAndLeaveData = async () => {
+        try {
+          // Fetch attendance records
+          const attendanceRes = await apiClient.get(`/employees/${id}/attendance`);
+          if (attendanceRes.data && attendanceRes.data.success) {
+            setAttendanceRecords(attendanceRes.data.data || []);
+          } else {
+            // Empty array if data not available
+            setAttendanceRecords([]);
+          }
+          
+          // Fetch leave records
+          const leaveRes = await apiClient.get(`/employees/${id}/leaves`);
+          if (leaveRes.data && leaveRes.data.success) {
+            setLeaveRecords(leaveRes.data.data || []);
+          } else {
+            // Empty array if data not available
+            setLeaveRecords([]);
+          }
+        } catch (err) {
+          console.error('Error fetching attendance or leave data:', err);
+          // Empty arrays for failed fetch
+          setAttendanceRecords([]);
+          setLeaveRecords([]);
+        }
+      };
+      
+      fetchAttendanceAndLeaveData();
+      setLoading(false);
+    } catch (err) {
+      console.error('Erreur lors du chargement des données de l\'employé:', err);
+      setError('Erreur lors du chargement des données de l\'employé. Vérifiez l\'identifiant et réessayez.');
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchEmployeeData = async () => {
-      try {
-        setLoading(true);
-        
-        // Dans une application réelle, vous récupéreriez ces données depuis votre API
-        // Pour l'instant, nous utiliserons des données fictives
-        
-        // Simuler un délai d'appel API
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Récupérer la liste des employés pour trouver celui avec l'ID correspondant
-        const allEmployees = [
-          {
-            id: '1',
-            firstName: 'Ahmed',
-            lastName: 'Benali',
-            employeeId: 'EMP001',
-            email: 'ahmed.benali@example.com',
-            phone: '+213 555 123 456',
-            position: 'Développeur Senior',
-            department: { id: '1', name: 'Informatique' },
-            hireDate: '2020-05-15',
-            birthDate: '1988-10-20',
-            gender: 'male',
-            nationalId: '88102012345',
-            address: {
-              street: '15 Rue des Oliviers',
-              city: 'Alger',
-              wilaya: 'Alger',
-              postalCode: '16000'
-            },
-            active: true
-          },
-          {
-            id: '2',
-            firstName: 'Fatima',
-            lastName: 'Zahra',
-            employeeId: 'EMP002',
-            email: 'fatima.zahra@example.com',
-            phone: '+213 555 789 012',
-            position: 'Responsable RH',
-            department: { id: '2', name: 'Ressources Humaines' },
-            hireDate: '2019-03-10',
-            birthDate: '1990-05-15',
-            gender: 'female',
-            nationalId: '90051523456',
-            address: {
-              street: '22 Boulevard Mohamed V',
-              city: 'Oran',
-              wilaya: 'Oran',
-              postalCode: '31000'
-            },
-            active: true
-          },
-          {
-            id: '3',
-            firstName: 'Mohammed',
-            lastName: 'Kaci',
-            employeeId: 'EMP003',
-            email: 'mohammed.kaci@example.com',
-            phone: '+213 555 345 678',
-            position: 'Comptable',
-            department: { id: '3', name: 'Finance' },
-            hireDate: '2021-01-20',
-            birthDate: '1985-12-05',
-            gender: 'male',
-            nationalId: '85120567890',
-            address: {
-              street: '8 Rue Didouche Mourad',
-              city: 'Constantine',
-              wilaya: 'Constantine',
-              postalCode: '25000'
-            },
-            active: true
-          }
-        ];
-        
-        // Trouver l'employé correspondant à l'ID
-        const foundEmployee = allEmployees.find(emp => emp.id === id) || allEmployees[0];
-        
-        // Données fictives de pointage adaptées à l'employé
-        const mockAttendance = [
-          { id: '1', date: '2023-09-01', checkIn: '08:45', checkOut: '17:30', status: 'present', workHours: 8.75 },
-          { id: '2', date: '2023-09-02', checkIn: '08:30', checkOut: '17:15', status: 'present', workHours: 8.75 },
-          { id: '3', date: '2023-09-03', checkIn: '09:10', checkOut: '17:45', status: 'late', workHours: 8.58 },
-          { id: '4', date: '2023-09-04', checkIn: '08:50', checkOut: '17:20', status: 'present', workHours: 8.5 },
-          { id: '5', date: '2023-09-05', checkIn: '08:40', checkOut: '18:00', status: 'present', workHours: 9.33 }
-        ];
-        
-        // Données fictives de congés
-        const mockLeaves = [
-          { id: '1', startDate: '2023-07-10', endDate: '2023-07-14', type: 'annual', status: 'approved', days: 5 },
-          { id: '2', startDate: '2023-08-25', endDate: '2023-08-25', type: 'sick', status: 'approved', days: 1 },
-          { id: '3', startDate: '2023-10-02', endDate: '2023-10-03', type: 'unpaid', status: 'pending', days: 2 }
-        ];
-        
-        setEmployee(foundEmployee);
-        setAttendanceRecords(mockAttendance);
-        setLeaveRecords(mockLeaves);
-        setLoading(false);
-      } catch (err) {
-        console.error('Erreur lors du chargement des données de l\'employé:', err);
-        setError('Erreur lors du chargement des données de l\'employé');
-        setLoading(false);
-      }
-    };
-
     fetchEmployeeData();
   }, [id]);
 
@@ -206,19 +171,219 @@ const EmployeeDetail = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      // Dans une application réelle, vous appelleriez votre API pour supprimer l'employé
-      // Pour l'instant, nous allons simplement naviguer vers la liste des employés
+      // Call API to delete the employee
+      const deleteRes = await apiClient.delete(`/employees/${id}`);
       
-      setDeleteDialogOpen(false);
-      navigate('/employees');
+      if (deleteRes.data && deleteRes.data.success) {
+        setDeleteDialogOpen(false);
+        navigate('/employees');
+      } else {
+        throw new Error('Failed to delete employee');
+      }
     } catch (err) {
       console.error('Erreur lors de la suppression de l\'employé:', err);
       setError('Erreur lors de la suppression de l\'employé');
+      setDeleteDialogOpen(false);
     }
   };
 
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
+  };
+
+  const handleOpenFaceScanner = () => {
+    setOpenFaceScanner(true);
+  };
+
+  const handleCloseFaceScanner = () => {
+    setOpenFaceScanner(false);
+  };
+
+  const handleFaceRegistrationSuccess = async (result) => {
+    console.log('Face registration successful:', result);
+    setBiometricSuccess('Visage enregistré avec succès!');
+    
+    // Update biometric status
+    if (result && result.status) {
+      setBiometricStatus(prevStatus => ({
+        ...prevStatus,
+        faceRecognition: {
+          status: result.status,
+          samplesCount: result.samplesCount || prevStatus.faceRecognition.samplesCount,
+          enrollmentDate: new Date().toISOString()
+        }
+      }));
+    }
+    
+    // Close scanner
+    setOpenFaceScanner(false);
+    
+    // Refresh employee data after a short delay
+    setTimeout(() => {
+      fetchEmployeeData();
+    }, 1000);
+  };
+
+  // Get status label and color for biometric status
+  const getBiometricStatusInfo = (status) => {
+    switch (status) {
+      case 'completed':
+        return { label: 'Enregistré', color: 'success' };
+      case 'in_progress':
+        return { label: 'En cours', color: 'warning' };
+      case 'validated':
+        return { label: 'Validé', color: 'success' };
+      case 'rejected':
+        return { label: 'Rejeté', color: 'error' };
+      case 'not_started':
+      default:
+        return { label: 'Non enregistré', color: 'error' };
+    }
+  };
+
+  // Render the biometrics tab
+  const renderBiometricsTab = () => {
+    const faceStatus = biometricStatus?.faceRecognition?.status || 'not_started';
+    const fingerprintStatus = biometricStatus?.fingerprint?.status || 'not_started';
+    
+    const faceStatusInfo = getBiometricStatusInfo(faceStatus);
+    const fingerprintStatusInfo = getBiometricStatusInfo(fingerprintStatus);
+    
+    return (
+      <Box>
+        {biometricSuccess && (
+          <Alert severity="success" sx={{ mb: 3 }} onClose={() => setBiometricSuccess(null)}>
+            {biometricSuccess}
+          </Alert>
+        )}
+        
+        <Typography variant="h6" gutterBottom>
+          Informations Biométriques
+        </Typography>
+        
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardHeader 
+                avatar={<FaceIcon color="primary" />}
+                title="Reconnaissance Faciale"
+                subheader={
+                  <Chip 
+                    label={faceStatusInfo.label}
+                    color={faceStatusInfo.color}
+                    size="small"
+                    sx={{ mt: 1 }}
+                  />
+                }
+                action={
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddPhotoIcon />}
+                    onClick={handleOpenFaceScanner}
+                    sx={{ mt: 1 }}
+                  >
+                    {faceStatus === 'not_started' ? 'Enregistrer' : 'Mettre à jour'}
+                  </Button>
+                }
+              />
+              <CardContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Échantillons: {biometricStatus?.faceRecognition?.samplesCount || 0}
+                  </Typography>
+                  
+                  {biometricStatus?.faceRecognition?.enrollmentDate && (
+                    <Typography variant="body2" color="text.secondary">
+                      Date d'enregistrement: {new Date(biometricStatus.faceRecognition.enrollmentDate).toLocaleDateString()}
+                    </Typography>
+                  )}
+                  
+                  <Typography variant="body2" color="text.primary" sx={{ mt: 2 }}>
+                    La reconnaissance faciale permet à l'employé de pointer sa présence rapidement et de manière sécurisée.
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardHeader 
+                avatar={<FingerprintIcon color="primary" />}
+                title="Empreinte Digitale"
+                subheader={
+                  <Chip 
+                    label={fingerprintStatusInfo.label}
+                    color={fingerprintStatusInfo.color}
+                    size="small"
+                    sx={{ mt: 1 }}
+                  />
+                }
+                action={
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<FingerprintIcon />}
+                    disabled={true} // To be implemented in the future
+                    sx={{ mt: 1 }}
+                  >
+                    {fingerprintStatus === 'not_started' ? 'Enregistrer' : 'Mettre à jour'}
+                  </Button>
+                }
+              />
+              <CardContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Échantillons: {biometricStatus?.fingerprint?.samplesCount || 0}
+                  </Typography>
+                  
+                  {biometricStatus?.fingerprint?.enrollmentDate && (
+                    <Typography variant="body2" color="text.secondary">
+                      Date d'enregistrement: {new Date(biometricStatus.fingerprint.enrollmentDate).toLocaleDateString()}
+                    </Typography>
+                  )}
+                  
+                  <Typography variant="body2" color="text.primary" sx={{ mt: 2 }}>
+                    La reconnaissance par empreinte digitale sera disponible prochainement.
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+        
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Sécurité et Accès
+          </Typography>
+          
+          <Paper sx={{ p: 2 }}>
+            <List>
+              <ListItem>
+                <ListItemIcon>
+                  <SecurityIcon />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Validation des données biométriques" 
+                  secondary="Les données biométriques sont cryptées et stockées de manière sécurisée conformément aux réglementations en vigueur."
+                />
+              </ListItem>
+            </List>
+          </Paper>
+        </Box>
+        
+        {/* Face Scanner Dialog */}
+        <FaceScanner 
+          open={openFaceScanner}
+          onClose={handleCloseFaceScanner}
+          onSuccess={handleFaceRegistrationSuccess}
+          mode="register"
+          employeeId={id}
+          employeeName={`${employee.firstName} ${employee.lastName}`}
+        />
+      </Box>
+    );
   };
 
   if (loading) {
@@ -263,7 +428,7 @@ const EmployeeDetail = () => {
           <Box>
             <Button
               component={Link}
-              to={`/employees/edit/${employee.id}`}
+              to={`/employees/edit/${employee._id || employee.id}`}
               variant="outlined"
               startIcon={<EditIcon />}
               sx={{ mr: 2 }}
@@ -272,7 +437,7 @@ const EmployeeDetail = () => {
             </Button>
             <Button
               component={Link}
-              to={`/employees/${employee.id}/schedule`}
+              to={`/employees/${employee._id || employee.id}/schedule`}
               variant="outlined"
               color="primary"
               startIcon={<ScheduleIcon />}
@@ -311,10 +476,10 @@ const EmployeeDetail = () => {
                 {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
               </Avatar>
               <Typography variant="h5" component="h2" align="center">
-                {employee.firstName} {employee.lastName}
+                {employee.firstName || ''} {employee.lastName || ''}
               </Typography>
               <Typography variant="body1" color="text.secondary" align="center">
-                {employee.position}
+                {employee.position || 'Sans poste'}
               </Typography>
               <Chip
                 label={employee.active ? 'Actif' : 'Inactif'}
@@ -332,7 +497,7 @@ const EmployeeDetail = () => {
                 </ListItemIcon>
                 <ListItemText
                   primary="ID Employé"
-                  secondary={employee.employeeId}
+                  secondary={employee.employeeId || 'Non spécifié'}
                 />
               </ListItem>
               <ListItem>
@@ -341,7 +506,7 @@ const EmployeeDetail = () => {
                 </ListItemIcon>
                 <ListItemText
                   primary="Email"
-                  secondary={employee.email}
+                  secondary={employee.email || 'Non spécifié'}
                 />
               </ListItem>
               <ListItem>
@@ -350,7 +515,7 @@ const EmployeeDetail = () => {
                 </ListItemIcon>
                 <ListItemText
                   primary="Téléphone"
-                  secondary={employee.phone}
+                  secondary={employee.phone || 'Non spécifié'}
                 />
               </ListItem>
               <ListItem>
@@ -359,7 +524,7 @@ const EmployeeDetail = () => {
                 </ListItemIcon>
                 <ListItemText
                   primary="Département"
-                  secondary={employee.department.name}
+                  secondary={employee.department?.name || 'Non spécifié'}
                 />
               </ListItem>
               <ListItem>
@@ -368,7 +533,7 @@ const EmployeeDetail = () => {
                 </ListItemIcon>
                 <ListItemText
                   primary="Date d'embauche"
-                  secondary={new Date(employee.hireDate).toLocaleDateString('fr-FR')}
+                  secondary={employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('fr-FR') : 'Non spécifié'}
                 />
               </ListItem>
             </List>
@@ -389,6 +554,7 @@ const EmployeeDetail = () => {
                 <Tab label="Informations Personnelles" />
                 <Tab label="Pointages" />
                 <Tab label="Congés" />
+                <Tab label="Biométrie" />
               </Tabs>
             </Box>
 
@@ -416,7 +582,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Date de Naissance"
-                            secondary={new Date(employee.birthDate).toLocaleDateString('fr-FR')}
+                            secondary={employee.birthDate ? new Date(employee.birthDate).toLocaleDateString('fr-FR') : 'Non spécifié'}
                           />
                         </ListItem>
                         <ListItem>
@@ -425,7 +591,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Numéro d'Identité Nationale"
-                            secondary={employee.nationalId}
+                            secondary={employee.nationalId || 'Non spécifié'}
                           />
                         </ListItem>
                         <ListItem>
@@ -434,7 +600,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Genre"
-                            secondary={employee.gender === 'male' ? 'Homme' : 'Femme'}
+                            secondary={employee.gender === 'male' ? 'Homme' : employee.gender === 'female' ? 'Femme' : 'Non spécifié'}
                           />
                         </ListItem>
                       </List>
@@ -453,7 +619,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Rue"
-                            secondary={employee.address.street}
+                            secondary={employee.address?.street || 'Non spécifié'}
                           />
                         </ListItem>
                         <ListItem>
@@ -462,7 +628,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Ville"
-                            secondary={employee.address.city}
+                            secondary={employee.address?.city || 'Non spécifié'}
                           />
                         </ListItem>
                         <ListItem>
@@ -471,7 +637,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Wilaya"
-                            secondary={employee.address.wilaya}
+                            secondary={employee.address?.wilaya || 'Non spécifié'}
                           />
                         </ListItem>
                         <ListItem>
@@ -480,7 +646,7 @@ const EmployeeDetail = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary="Code Postal"
-                            secondary={employee.address.postalCode}
+                            secondary={employee.address?.postalCode || 'Non spécifié'}
                           />
                         </ListItem>
                       </List>
@@ -612,6 +778,11 @@ const EmployeeDetail = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </TabPanel>
+
+            {/* Biometrics Tab */}
+            <TabPanel value={tabValue} index={3}>
+              {renderBiometricsTab()}
             </TabPanel>
           </Paper>
         </Grid>

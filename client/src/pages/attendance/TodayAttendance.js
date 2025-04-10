@@ -63,6 +63,7 @@ import QrCodeScanner from '../../components/attendance/QrCodeScanner';
 import RealTimeStats from '../../components/attendance/RealTimeStats';
 import AttendanceTrends from '../../components/attendance/AttendanceTrends';
 import { fr } from 'date-fns/locale';
+import apiClient from '../../utils/api';
 
 const TodayAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -99,6 +100,7 @@ const TodayAttendance = () => {
   const [userRole, setUserRole] = useState('');
   const [isChefEquipe, setIsChefEquipe] = useState(false);
   const [selectedAttendanceRecord, setSelectedAttendanceRecord] = useState(null);
+  const [selectedEmployeeForFace, setSelectedEmployeeForFace] = useState(null);
   
   // Add new state variables
   const [openQrCodeScanner, setOpenQrCodeScanner] = useState(false);
@@ -135,7 +137,7 @@ const TodayAttendance = () => {
   const fetchUserRole = async () => {
     try {
       console.log('Fetching user role...');
-      const res = await axios.get('/api/auth/me');
+      const res = await apiClient.get('/auth/me');
       console.log('User role response:', res.data);
       setUserRole(res.data.data.role);
       setIsChefEquipe(res.data.data.role === 'chef_equipe' || res.data.data.role === 'admin');
@@ -156,7 +158,7 @@ const TodayAttendance = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await axios.get('/api/employees?active=true');
+      const res = await apiClient.get('/employees?active=true');
       setEmployees(res.data.data || []);
     } catch (err) {
       console.error('Error fetching employees:', err);
@@ -165,7 +167,7 @@ const TodayAttendance = () => {
 
   const fetchAttendanceCodes = async () => {
     try {
-      const res = await axios.get('/api/attendance-codes');
+      const res = await apiClient.get('/attendance-codes');
       setAttendanceCodes(res.data.data || []);
     } catch (err) {
       console.error('Error fetching attendance codes:', err);
@@ -188,52 +190,39 @@ const TodayAttendance = () => {
       
       let attendanceData = [];
       
-      // Try to fetch data from API
-      try {
-        // Make actual API call to fetch today's attendance
-        const res = await axios.get('/api/attendance/today');
-        
-        console.log('API response:', res.data);
-        
-        // Handle different response formats
-        if (res.data && res.data.success === true) {
-          // Format 1: { success: true, data: { records: [...] } }
-          if (res.data.data && Array.isArray(res.data.data.records)) {
-            attendanceData = res.data.data.records;
-          } 
-          // Format 2: { success: true, data: [...] }
-          else if (Array.isArray(res.data.data)) {
-            attendanceData = res.data.data;
-          }
-          // Format 3: { success: true, data: { records: [...] } }
-          else if (res.data.data && res.data.data.records) {
-            attendanceData = res.data.data.records;
-          }
-        } else if (res.data && Array.isArray(res.data)) {
-          // Format 4: Direct array
-          attendanceData = res.data;
-        } else {
-          console.error('Unknown API response format:', res.data);
-          throw new Error('Format de réponse inconnu');
+      // Fetch data from API using the centralized API client
+      const res = await apiClient.get('/attendance/today');
+      
+      console.log('API response:', res.data);
+      
+      // Handle different response formats
+      if (res.data && res.data.success === true) {
+        // Format 1: { success: true, data: { records: [...] } }
+        if (res.data.data && Array.isArray(res.data.data.records)) {
+          attendanceData = res.data.data.records;
+        } 
+        // Format 2: { success: true, data: [...] }
+        else if (Array.isArray(res.data.data)) {
+          attendanceData = res.data.data;
         }
-      } catch (apiError) {
-        console.error('API error:', apiError);
-        
-        // In development, use fallback data without showing error
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Using fallback attendance data in development');
-        } else {
-          // In production, show error
-          setError('Erreur lors du chargement des données de présence.');
+        // Format 3: { success: true, data: { records: [...] } }
+        else if (res.data.data && res.data.data.records) {
+          attendanceData = res.data.data.records;
         }
-        
-        // Generate mock data as fallback
-        attendanceData = generateMockAttendanceData();
+      } else if (res.data && Array.isArray(res.data)) {
+        // Format 4: Direct array
+        attendanceData = res.data;
+      } else {
+        console.error('Unknown API response format:', res.data);
+        throw new Error('Format de réponse inconnu');
       }
+      
+      console.log('Parsed attendance data:', attendanceData);
       
       // Filter out deleted employees from the attendance records
       const filteredRecords = attendanceData.filter(record => 
-        record && record.employee && !deletedIds.includes(record.employee.id)
+        record && record.employee && 
+        !deletedIds.includes(record.employee._id || record.employee.id)
       );
       
       // Create filtered records based on search term
@@ -265,59 +254,54 @@ const TodayAttendance = () => {
       setFilteredRecords(searchFilteredRecords);
       
       // Get list of employees who haven't checked in today
-      try {
-        const employeesRes = await axios.get('/api/employees/active');
-        let activeEmployees = [];
-        
-        if (employeesRes.data && employeesRes.data.success && Array.isArray(employeesRes.data.data)) {
-          activeEmployees = employeesRes.data.data;
-        } else if (employeesRes.data && Array.isArray(employeesRes.data)) {
-          activeEmployees = employeesRes.data;
-        } else {
-          // Generate mock employees as fallback
-          activeEmployees = generateMockEmployees();
-        }
-        
-        // Filter out deleted employees
-        const availableEmployees = activeEmployees.filter(emp => !deletedIds.includes(emp.id));
-        
-        // Filter out employees who have already checked in
-        const notCheckedInEmployees = availableEmployees.filter(emp => 
-          !filteredRecords.some(rec => 
-            rec.employee && 
-            emp._id && 
-            rec.employee._id === emp._id && 
-            rec.checkIn)
-        );
-        
-        setEmployees(availableEmployees);
-        setNotCheckedInEmployees(notCheckedInEmployees);
-      } catch (empErr) {
-        console.error('Error fetching active employees:', empErr);
-        // Continue without showing the not checked in employees
-        const mockEmployees = generateMockEmployees();
-        setEmployees(mockEmployees);
-        setNotCheckedInEmployees(mockEmployees);
+      const employeesRes = await apiClient.get('/employees');
+      let activeEmployees = [];
+      
+      if (employeesRes.data && employeesRes.data.success && Array.isArray(employeesRes.data.data)) {
+        activeEmployees = employeesRes.data.data;
+      } else if (employeesRes.data && Array.isArray(employeesRes.data)) {
+        activeEmployees = employeesRes.data;
+      } else {
+        console.error('Invalid employees data format:', employeesRes.data);
+        activeEmployees = [];
       }
+      
+      // Filter out deleted employees and inactive employees
+      const availableEmployees = activeEmployees.filter(emp => 
+        emp.active !== false && !deletedIds.includes(emp._id || emp.id)
+      );
+      
+      console.log('Available employees:', availableEmployees);
+      
+      // Filter out employees who have already checked in
+      const notCheckedInEmployees = availableEmployees.filter(emp => {
+        const empId = emp._id || emp.id;
+        return !filteredRecords.some(rec => {
+          const recEmpId = rec.employee?._id || rec.employee?.id;
+          return recEmpId === empId && rec.checkIn;
+        });
+      });
+      
+      console.log('Not checked in employees:', notCheckedInEmployees);
+      
+      setEmployees(availableEmployees);
+      setNotCheckedInEmployees(notCheckedInEmployees);
       
     } catch (err) {
       console.error('Error in attendance workflow:', err);
-      setError('Erreur lors du chargement des données de présence.');
+      setError('Erreur lors du chargement des données de présence. Veuillez réessayer plus tard.');
       
-      // Use mock data as fallback
-      const mockData = generateMockAttendanceData();
-      setAttendanceRecords(mockData);
-      setFilteredRecords(mockData);
-      
-      const mockEmployees = generateMockEmployees();
-      setEmployees(mockEmployees);
-      setNotCheckedInEmployees(mockEmployees);
+      // Reset data on error
+      setAttendanceRecords([]);
+      setFilteredRecords([]);
+      setEmployees([]);
+      setNotCheckedInEmployees([]);
       
       setSummary({
-        total: mockData.length,
-        present: mockData.filter(record => record.status === 'present').length,
-        late: mockData.filter(record => record.status === 'late').length,
-        absent: mockData.filter(record => record.status === 'absent').length
+        total: 0,
+        present: 0,
+        late: 0,
+        absent: 0
       });
     } finally {
       setLoading(false);
@@ -325,59 +309,10 @@ const TodayAttendance = () => {
     }
   };
 
-  // Helper function to generate mock attendance data
-  const generateMockAttendanceData = () => {
-    const departments = ['KBK FROID', 'KBK ELEC', 'HML', 'REB', 'DEG', 'HAMRA'];
-    const statuses = ['present', 'late', 'absent'];
-    
-    return Array(10).fill(null).map((_, index) => {
-      const status = statuses[Math.floor(Math.random() * 3)];
-      const dept = departments[Math.floor(Math.random() * departments.length)];
-      
-      return {
-        _id: `mock-${index}`,
-        employee: {
-          _id: `emp-${index}`,
-          firstName: `Prénom${index}`,
-          lastName: `Nom${index}`,
-          department: {
-            _id: `dept-${dept}`,
-            name: dept
-          }
-        },
-        date: new Date(),
-        checkIn: status !== 'absent' ? { time: new Date(new Date().setHours(8, 0, 0, 0)) } : null,
-        checkOut: status === 'present' ? { time: new Date(new Date().setHours(17, 0, 0, 0)) } : null,
-        status,
-        workHours: status === 'present' ? 8 : (status === 'late' ? 7 : 0)
-      };
-    });
-  };
-
-  // Helper function to generate mock employees
-  const generateMockEmployees = () => {
-    const departments = ['KBK FROID', 'KBK ELEC', 'HML', 'REB', 'DEG', 'HAMRA'];
-    
-    return Array(20).fill(null).map((_, index) => {
-      const dept = departments[Math.floor(Math.random() * departments.length)];
-      
-      return {
-        _id: `emp-${index}`,
-        firstName: `Prénom${index}`,
-        lastName: `Nom${index}`,
-        department: {
-          _id: `dept-${dept}`,
-          name: dept
-        },
-        position: `Position ${index % 5 + 1}`
-      };
-    });
-  };
-
   // Add function to fetch weekly attendance data
   const fetchWeeklyData = async () => {
     try {
-      const res = await axios.get('/api/attendance/weekly');
+      const res = await apiClient.get('/attendance/weekly');
       setWeeklyData(res.data.data || []);
     } catch (err) {
       console.error('Error fetching weekly data:', err);
@@ -476,9 +411,9 @@ const TodayAttendance = () => {
 
   // Open biometric selection dialog
   const handleOpenBiometricDialog = (mode, employee = null, record = null) => {
-    setSelectedBiometricMode(mode);
-    setSelectedEmployee(employee);
+    setSelectedBiometricMode('');
     setSelectedAttendanceRecord(record);
+    setSelectedEmployee(employee);
     setOpenBiometricDialog(true);
   };
 
@@ -492,50 +427,90 @@ const TodayAttendance = () => {
     setOpenBiometricDialog(false);
     
     if (biometricType === 'face') {
-      if (selectedBiometricMode === 'checkIn') {
-        setFaceScanMode('checkIn');
-        setOpenFaceScanner(true);
-      } else if (selectedBiometricMode === 'checkOut') {
-        setFaceScanMode('checkOut');
-        setOpenFaceScanner(true);
+      // If employee is checking in
+      if (!selectedAttendanceRecord) {
+        handleOpenFaceScanner('checkIn', selectedEmployee);
+      } else {
+        // If employee is checking out
+        handleOpenFaceScanner('checkOut', null, selectedAttendanceRecord);
       }
     } else if (biometricType === 'fingerprint') {
-      if (selectedBiometricMode === 'checkIn') {
-        setFingerprintScanMode('checkIn');
-        setOpenFingerprintScanner(true);
-      } else if (selectedBiometricMode === 'checkOut') {
-        setFingerprintScanMode('checkOut');
-        setOpenFingerprintScanner(true);
-      }
+      // For future implementation
+      setSnackbar({
+        open: true,
+        message: 'La reconnaissance par empreinte digitale n\'est pas encore disponible',
+        severity: 'info'
+      });
     } else if (biometricType === 'qrcode') {
-      if (selectedBiometricMode === 'checkIn') {
-        setQrCodeScanMode('checkIn');
-        setOpenQrCodeScanner(true);
-      } else if (selectedBiometricMode === 'checkOut') {
-        setQrCodeScanMode('checkOut');
-        setOpenQrCodeScanner(true);
-      }
+      // For future implementation
+      setSnackbar({
+        open: true,
+        message: 'La reconnaissance par QR code n\'est pas encore disponible',
+        severity: 'info'
+      });
     }
   };
 
-  // Close face scanner
-  const handleCloseFaceScanner = () => {
-    setOpenFaceScanner(false);
+  // Handle opening face scanner dialog
+  const handleOpenFaceScanner = (mode, employee = null, record = null) => {
+    setFaceScanMode(mode);
+    setSelectedEmployeeForFace(employee || (record ? record.employee : null));
+    setOpenFaceScanner(true);
   };
 
-  // Handle face scan success
-  const handleFaceScanSuccess = (result) => {
-    setTimeout(() => {
-      setOpenFaceScanner(false);
+  // Handle closing face scanner dialog
+  const handleCloseFaceScanner = () => {
+    setOpenFaceScanner(false);
+    setSelectedEmployeeForFace(null);
+  };
+
+  // Handle successful face recognition
+  const handleFaceRecognitionSuccess = async (result) => {
+    console.log('Face recognition successful:', result);
+    
+    try {
+      let response;
+      
+      if (faceScanMode === 'checkIn') {
+        // Call API to check in
+        response = await apiClient.post('/attendance/check-in', {
+          employeeId: result.employeeId,
+          timestamp: result.timestamp,
+          method: 'face'
+        });
+      } else {
+        // Call API to check out
+        response = await apiClient.post('/attendance/check-out', {
+          employeeId: result.employeeId,
+          timestamp: result.timestamp,
+          method: 'face'
+        });
+      }
+      
+      if (response.data && response.data.success) {
+        // Show success message
+        setSnackbar({
+          open: true,
+          message: faceScanMode === 'checkIn' ? 'Pointage d\'entrée réussi' : 'Pointage de sortie réussi',
+          severity: 'success'
+        });
+        
+        // Close dialog
+        setOpenFaceScanner(false);
+        
+        // Refresh attendance data
+        fetchTodayAttendance();
+      } else {
+        throw new Error(response.data.message || 'Échec de l\'opération');
+      }
+    } catch (err) {
+      console.error('Error processing face recognition result:', err);
       setSnackbar({
         open: true,
-        message: faceScanMode === 'checkIn' 
-          ? `Entrée enregistrée pour ${result.firstName} ${result.lastName}` 
-          : `Sortie enregistrée pour ${result.firstName} ${result.lastName}`,
-        severity: 'success'
+        message: `Erreur: ${err.message || 'Échec de l\'opération'}`,
+        severity: 'error'
       });
-      fetchTodayAttendance();
-    }, 1500);
+    }
   };
 
   // Close fingerprint scanner
@@ -591,29 +566,58 @@ const TodayAttendance = () => {
     switch (dialogAction) {
       case 'check-in':
         console.log('Confirming check-in for:', selectedEmployee);
-        // API call would go here
-        setOpenDialog(false);
-        setSnackbar({
-          open: true,
-          message: `Pointage d'entrée réussi pour ${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`,
-          severity: 'success'
+        // Make real API call to check in employee
+        apiClient.post('/attendance/check-in', {
+          employeeId: selectedEmployee._id || selectedEmployee.id,
+          timestamp: new Date()
+        })
+        .then(response => {
+          console.log('Check-in response:', response.data);
+          setOpenDialog(false);
+          setSnackbar({
+            open: true,
+            message: `Pointage d'entrée réussi pour ${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`,
+            severity: 'success'
+          });
+          fetchTodayAttendance();
+        })
+        .catch(error => {
+          console.error('Error checking in:', error);
+          setSnackbar({
+            open: true,
+            message: `Erreur lors du pointage d'entrée`,
+            severity: 'error'
+          });
         });
-        fetchTodayAttendance();
         break;
       case 'check-out':
         console.log('Confirming check-out for:', selectedEmployee);
-        // API call would go here
-        setOpenDialog(false);
-        setSnackbar({
-          open: true,
-          message: `Pointage de sortie réussi pour ${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`,
-          severity: 'success'
+        // Make real API call to check out employee
+        apiClient.post('/attendance/check-out', {
+          employeeId: selectedEmployee._id || selectedEmployee.id,
+          timestamp: new Date()
+        })
+        .then(response => {
+          console.log('Check-out response:', response.data);
+          setOpenDialog(false);
+          setSnackbar({
+            open: true,
+            message: `Pointage de sortie réussi pour ${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`,
+            severity: 'success'
+          });
+          fetchTodayAttendance();
+        })
+        .catch(error => {
+          console.error('Error checking out:', error);
+          setSnackbar({
+            open: true,
+            message: `Erreur lors du pointage de sortie`,
+            severity: 'error'
+          });
         });
-        fetchTodayAttendance();
         break;
       case 'modify':
         console.log('Confirming modify for:', selectedEmployee, 'with code:', selectedCode);
-        // API call would go here
         setOpenDialog(false);
         setSnackbar({
           open: true,
@@ -625,6 +629,68 @@ const TodayAttendance = () => {
       default:
         setOpenDialog(false);
     }
+  };
+
+  // Update the dialog for biometric selection
+  const renderBiometricSelectionDialog = () => {
+    const dialogTitle = selectedAttendanceRecord 
+      ? 'Choisir une méthode de pointage de sortie'
+      : 'Choisir une méthode de pointage d\'entrée';
+
+    return (
+      <Dialog
+        open={openBiometricDialog}
+        onClose={() => setOpenBiometricDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{dialogTitle}</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<FaceIcon />}
+                onClick={() => handleBiometricSelection('face')}
+                sx={{ py: 2 }}
+              >
+                Reconnaissance Faciale
+              </Button>
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<FingerprintIcon />}
+                onClick={() => handleBiometricSelection('fingerprint')}
+                disabled
+                sx={{ py: 2 }}
+              >
+                Empreinte Digitale (Bientôt)
+              </Button>
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<QrCodeIcon />}
+                onClick={() => handleBiometricSelection('qrcode')}
+                disabled
+                sx={{ py: 2 }}
+              >
+                QR Code (Bientôt)
+              </Button>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenBiometricDialog(false)}>
+            Annuler
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
   };
 
   return (
@@ -1615,63 +1681,17 @@ const TodayAttendance = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog 
-        open={openBiometricDialog} 
-        onClose={handleCloseBiometricDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          {selectedBiometricMode === 'checkIn' 
-            ? 'Choisissez une méthode de pointage d\'entrée'
-            : 'Choisissez une méthode de pointage de sortie'}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Veuillez choisir une méthode de pointage biométrique:
-          </DialogContentText>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 3, justifyContent: 'center' }}>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<FaceIcon />}
-              onClick={() => handleBiometricSelection('face')}
-              sx={{ py: 2, px: 3, fontSize: '1rem' }}
-            >
-              Visage
-            </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<FingerprintIcon />}
-              onClick={() => handleBiometricSelection('fingerprint')}
-              sx={{ py: 2, px: 3, fontSize: '1rem' }}
-            >
-              Empreinte
-            </Button>
-            <Button
-              variant="contained"
-              color="info"
-              startIcon={<QrCodeIcon />}
-              onClick={() => handleBiometricSelection('qrcode')}
-              sx={{ py: 2, px: 3, fontSize: '1rem' }}
-            >
-              QR Code
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseBiometricDialog}>Annuler</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Biometric Selection Dialog */}
+      {renderBiometricSelectionDialog()}
       
+      {/* Face Scanner component */}
       <FaceScanner
         open={openFaceScanner}
         onClose={handleCloseFaceScanner}
-        onSuccess={handleFaceScanSuccess}
-        mode={faceScanMode}
-        employeeId={selectedEmployee?._id}
-        title={faceScanMode === 'checkIn' ? 'Pointage d\'entrée par reconnaissance faciale' : 'Pointage de sortie par reconnaissance faciale'}
+        onSuccess={handleFaceRecognitionSuccess}
+        mode="recognize"
+        employeeId={selectedEmployeeForFace?._id}
+        employeeName={selectedEmployeeForFace ? `${selectedEmployeeForFace.firstName} ${selectedEmployeeForFace.lastName}` : ''}
       />
       
       <FingerprintScanner

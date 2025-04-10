@@ -1,0 +1,142 @@
+[
+  {
+    "key": "employee:1",
+    "value": {
+      "id": "1",
+      "firstName": "Mohammed",
+      "lastName": "Benali",
+      "email": "mohammed.benali@example.com",
+      "position": "Technicien",
+      "departmentId": "1",
+      "department": "DEG",
+      "createdAt": "2023-01-15T08:00:00.000Z",
+      "updatedAt": "2023-01-15T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:2",
+    "value": {
+      "id": "2",
+      "firstName": "Fatima",
+      "lastName": "Zahra",
+      "email": "fatima.zahra@example.com",
+      "position": "Ingénieur",
+      "departmentId": "2",
+      "department": "KBK FROID",
+      "createdAt": "2023-01-16T08:00:00.000Z",
+      "updatedAt": "2023-01-16T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:3",
+    "value": {
+      "id": "3",
+      "firstName": "Ahmed",
+      "lastName": "Kader",
+      "email": "ahmed.kader@example.com",
+      "position": "Technicien",
+      "departmentId": "3",
+      "department": "HAMRA",
+      "createdAt": "2023-01-17T08:00:00.000Z",
+      "updatedAt": "2023-01-17T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:4",
+    "value": {
+      "id": "4",
+      "firstName": "Karim",
+      "lastName": "Benzema",
+      "email": "karim.benzema@example.com",
+      "position": "Chef d'équipe",
+      "departmentId": "2",
+      "department": "KBK FROID",
+      "createdAt": "2023-01-18T08:00:00.000Z",
+      "updatedAt": "2023-01-18T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:5",
+    "value": {
+      "id": "5",
+      "firstName": "Leila",
+      "lastName": "Hadj",
+      "email": "leila.hadj@example.com",
+      "position": "Ingénieur",
+      "departmentId": "4",
+      "department": "HML",
+      "createdAt": "2023-01-19T08:00:00.000Z",
+      "updatedAt": "2023-01-19T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:6",
+    "value": {
+      "id": "6",
+      "firstName": "Youcef",
+      "lastName": "Benatia",
+      "email": "youcef.benatia@example.com",
+      "position": "Technicien",
+      "departmentId": "3",
+      "department": "HAMRA",
+      "createdAt": "2023-01-20T08:00:00.000Z",
+      "updatedAt": "2023-01-20T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:7",
+    "value": {
+      "id": "7",
+      "firstName": "Amina",
+      "lastName": "Belkacem",
+      "email": "amina.belkacem@example.com",
+      "position": "Assistante",
+      "departmentId": "1",
+      "department": "DEG",
+      "createdAt": "2023-01-21T08:00:00.000Z",
+      "updatedAt": "2023-01-21T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:8",
+    "value": {
+      "id": "8",
+      "firstName": "Omar",
+      "lastName": "Cherif",
+      "email": "omar.cherif@example.com",
+      "position": "Technicien",
+      "departmentId": "2",
+      "department": "KBK FROID",
+      "createdAt": "2023-01-22T08:00:00.000Z",
+      "updatedAt": "2023-01-22T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:9",
+    "value": {
+      "id": "9",
+      "firstName": "Samira",
+      "lastName": "Saidi",
+      "email": "samira.saidi@example.com",
+      "position": "Ingénieur",
+      "departmentId": "3",
+      "department": "HAMRA",
+      "createdAt": "2023-01-23T08:00:00.000Z",
+      "updatedAt": "2023-01-23T08:00:00.000Z"
+    }
+  },
+  {
+    "key": "employee:10",
+    "value": {
+      "id": "10",
+      "firstName": "Rachid",
+      "lastName": "Mehdaoui",
+      "email": "rachid.mehdaoui@example.com",
+      "position": "Chef d'équipe",
+      "departmentId": "4",
+      "department": "HML",
+      "createdAt": "2023-01-24T08:00:00.000Z",
+      "updatedAt": "2023-01-24T08:00:00.000Z"
+    }
+  }
+] 

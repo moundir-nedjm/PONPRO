@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -82,11 +83,12 @@ const AttendancePrintView = () => {
 
   const fetchAttendanceCodes = async () => {
     try {
-      const response = await axios.get('/api/attendance-codes');
-      setAttendanceCodes(response.data.data);
+      const response = await apiClient.get('/attendance-codes');
+      setAttendanceCodes(response.data.data || []);
+      setError(null);
     } catch (err) {
       setError('Erreur lors du chargement des codes de présence');
-      console.error(err);
+      console.error('Error fetching attendance codes:', err);
     }
   };
 

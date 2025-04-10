@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { useSettings } from './context/SettingsContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { SocketProvider } from './context/SocketContext';
 import { AttendanceProvider } from './context/AttendanceContext';
@@ -16,6 +16,10 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import NotFound from './pages/errors/NotFound';
 import Unauthorized from './pages/errors/Unauthorized';
 import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+// ForgotPassword and ResetPassword components don't exist yet
+// import ForgotPassword from './pages/auth/ForgotPassword';
+// import ResetPassword from './pages/auth/ResetPassword';
 
 // Dashboard and Main Pages
 import Dashboard from './pages/dashboard/Dashboard';
@@ -56,6 +60,7 @@ import AttendanceCodeLegend from './components/attendance/AttendanceCodeLegend';
 import DepartmentList from './pages/departments/DepartmentList';
 import DepartmentDetail from './pages/departments/DepartmentDetail';
 import DepartmentForm from './pages/departments/DepartmentForm';
+import DepartmentDashboard from './pages/departments/DepartmentDashboard';
 
 // Leave Pages
 import LeaveList from './pages/leaves/LeaveList';
@@ -94,6 +99,7 @@ import TeamBiometricManagement from './pages/biometrics/TeamBiometricManagement'
 // Create a separate component that uses the settings context
 const AppWithTheme = () => {
   const { settings } = useSettings();
+  const { currentUser } = useAuth();
   
   // Create a theme based on settings
   const theme = useMemo(() => {
@@ -153,18 +159,31 @@ const AppWithTheme = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Routes>
-        {/* Auth Routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        {/* Commented out routes for non-existent components */}
+        {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
+        {/* <Route path="/reset-password" element={<ResetPassword />} /> */}
         
-        {/* Protected Routes */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="/dashboard" />} />
-          <Route path="dashboard" element={<Dashboard />} />
-
+        {/* Protected routes - use Layout for these */}
+        <Route 
+          path="/"
+          element={<ProtectedRoute><Layout /></ProtectedRoute>}
+        >
+          {/* Redirect based on user role */}
+          <Route path="/" element={
+            <Navigate to={
+              !currentUser ? "/login" : 
+              currentUser.role === 'chef' || (currentUser.name && currentUser.name.startsWith('Adm ')) ? "/employee/dashboard" :
+              currentUser.role === 'employee' ? "/employee/dashboard" : 
+              "/dashboard"
+            } />
+          } />
+          
+          {/* Main routes */}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
+          
           {/* Routes des Employés */}
           <Route path="employees">
             <Route index element={<EmployeeList />} />
@@ -182,12 +201,8 @@ const AppWithTheme = () => {
             <Route path="biometrics" element={<EmployeeBiometrics />} />
             <Route path="settings">
               <Route index element={<Navigate to="/employee/settings/face" />} />
-              <Route path="face" element={
-                <ProtectedRoute element={<FaceSettings />} allowedRoles={['employee', 'chef']} />
-              } />
-              <Route path="fingerprint" element={
-                <ProtectedRoute element={<FingerprintSettings />} allowedRoles={['employee', 'chef']} />
-              } />
+              <Route path="face" element={<FaceSettings />} />
+              <Route path="fingerprint" element={<FingerprintSettings />} />
             </Route>
           </Route>
 
@@ -214,6 +229,7 @@ const AppWithTheme = () => {
             <Route path=":id" element={<DepartmentDetail />} />
             <Route path="new" element={<DepartmentForm />} />
             <Route path="edit/:id" element={<DepartmentForm />} />
+            <Route path="dashboard" element={<DepartmentDashboard />} />
           </Route>
 
           {/* Routes des Congés */}
@@ -292,21 +308,15 @@ const AppWithTheme = () => {
 };
 
 function App() {
-  // Move the providers here and use AppWithTheme
+  // Restore all the providers that were removed
   return (
-    <AuthProvider>
-      <SettingsProvider>
-        <SocketProvider>
-          <OrganizationProvider>
-            <AttendanceProvider>
-              <BiometricProvider>
-                <AppWithTheme />
-              </BiometricProvider>
-            </AttendanceProvider>
-          </OrganizationProvider>
-        </SocketProvider>
-      </SettingsProvider>
-    </AuthProvider>
+    <BiometricProvider>
+      <OrganizationProvider>
+        <AttendanceProvider>
+          <AppWithTheme />
+        </AttendanceProvider>
+      </OrganizationProvider>
+    </BiometricProvider>
   );
 }
 

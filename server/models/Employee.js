@@ -49,6 +49,15 @@ const EmployeeSchema = new mongoose.Schema({
   departmentName: {
     type: String
   },
+  role: {
+    type: String,
+    enum: ['admin', 'manager', 'chef', 'employee', 'user'],
+    default: 'employee'
+  },
+  password: {
+    type: String,
+    default: 'changeme123'
+  },
   hireDate: {
     type: Date,
     default: Date.now
@@ -69,6 +78,27 @@ const EmployeeSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+// Add a pre-save hook to ensure proper biometricStatus initialization
+EmployeeSchema.pre('save', function(next) {
+  // Initialize biometricStatus if not set
+  if (!this.biometricStatus) {
+    this.biometricStatus = {
+      faceRecognition: { status: 'not_started', samplesCount: 0 },
+      fingerprint: { status: 'not_started', samplesCount: 0 }
+    };
+  } else {
+    // Initialize faceRecognition if not set
+    if (!this.biometricStatus.faceRecognition) {
+      this.biometricStatus.faceRecognition = { status: 'not_started', samplesCount: 0 };
+    }
+    // Initialize fingerprint if not set
+    if (!this.biometricStatus.fingerprint) {
+      this.biometricStatus.fingerprint = { status: 'not_started', samplesCount: 0 };
+    }
+  }
+  next();
 });
 
 const Employee = mongoose.model('Employee', EmployeeSchema);

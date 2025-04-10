@@ -30,6 +30,7 @@ import {
   Search as SearchIcon,
   Edit as EditIcon
 } from '@mui/icons-material';
+import axios from 'axios';
 
 const EmployeeSettings = () => {
   const [employees, setEmployees] = useState([]);
@@ -45,70 +46,22 @@ const EmployeeSettings = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
+      const res = await axios.get('/api/employees');
       
-      // Mock API call with a delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Mock employee data
-      const mockEmployees = [
-        {
-          id: '1',
-          firstName: 'Ahmed',
-          lastName: 'Benali',
-          employeeId: 'EMP001',
-          email: 'ahmed.benali@example.com',
-          department: { name: 'Informatique' },
-          position: 'Développeur Senior',
-          active: true
-        },
-        {
-          id: '2',
-          firstName: 'Fatima',
-          lastName: 'Zahra',
-          employeeId: 'EMP002',
-          email: 'fatima.zahra@example.com',
-          department: { name: 'Ressources Humaines' },
-          position: 'Responsable RH',
-          active: true
-        },
-        {
-          id: '3',
-          firstName: 'Mohammed',
-          lastName: 'Kaci',
-          employeeId: 'EMP003',
-          email: 'mohammed.kaci@example.com',
-          department: { name: 'Finance' },
-          position: 'Comptable',
-          active: true
-        },
-        {
-          id: '4',
-          firstName: 'Karim',
-          lastName: 'Benzema',
-          employeeId: 'EMP004',
-          email: 'karim.benzema@example.com',
-          department: { name: 'Marketing' },
-          position: 'Chef de Projet',
-          active: false
-        },
-        {
-          id: '5',
-          firstName: 'Amina',
-          lastName: 'Beloufa',
-          employeeId: 'EMP005',
-          email: 'amina.beloufa@example.com',
-          department: { name: 'Opérations' },
-          position: 'Analyste',
-          active: true
-        }
-      ];
-      
-      setEmployees(mockEmployees);
-      setFilteredEmployees(mockEmployees);
-      setLoading(false);
+      if (res.data && res.data.success && Array.isArray(res.data.data)) {
+        setEmployees(res.data.data);
+        setFilteredEmployees(res.data.data);
+      } else if (Array.isArray(res.data)) {
+        setEmployees(res.data);
+        setFilteredEmployees(res.data);
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (err) {
-      console.error('Erreur lors du chargement des employés:', err);
-      setError('Impossible de charger la liste des employés');
+      console.error('Error fetching employees:', err);
+      setEmployees([]);
+      setFilteredEmployees([]);
+    } finally {
       setLoading(false);
     }
   };

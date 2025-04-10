@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -93,13 +94,15 @@ const AttendanceCodeLegend = () => {
   const fetchAttendanceCodes = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/attendance-codes');
-      setCodes(response.data.data);
-      setFilteredCodes(response.data.data);
+      const response = await apiClient.get('/attendance-codes');
+      setCodes(response.data.data || []);
+      setFilteredCodes(response.data.data || []);
       setError(null);
     } catch (err) {
       setError('Erreur lors du chargement des codes de présence');
-      console.error(err);
+      console.error('Error fetching attendance codes:', err);
+      setCodes([]);
+      setFilteredCodes([]);
     } finally {
       setLoading(false);
     }

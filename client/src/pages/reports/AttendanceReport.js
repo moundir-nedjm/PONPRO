@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -67,7 +68,7 @@ const AttendanceReport = () => {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await axios.get('/api/departments');
+        const res = await apiClient.get('/departments');
         setDepartments(res.data.data || []);
       } catch (err) {
         console.error('Error fetching departments:', err);
@@ -85,18 +86,21 @@ const AttendanceReport = () => {
     try {
       setLoading(true);
       
-      // Format dates for API
-      const startDate = format(filters.startDate, 'yyyy-MM-dd');
-      const endDate = format(filters.endDate, 'yyyy-MM-dd');
-      
-      // Build query params
-      let url = `/api/reports/attendance?startDate=${startDate}&endDate=${endDate}`;
-      if (filters.department !== 'all') {
-        url += `&department=${filters.department}`;
+      // Create URL parameters
+      const params = new URLSearchParams();
+      if (filters.startDate) {
+        params.append('startDate', filters.startDate.toISOString());
+      }
+      if (filters.endDate) {
+        params.append('endDate', filters.endDate.toISOString());
+      }
+      if (filters.department && filters.department !== 'all') {
+        params.append('department', filters.department);
       }
       
-      console.log('Fetching attendance report from:', url);
-      const res = await axios.get(url, { timeout: 5000 }); // Add timeout to prevent long hanging requests
+      const url = `/reports/attendance?${params.toString()}`;
+      const res = await apiClient.get(url);
+      
       console.log('Attendance report data:', res.data);
       
       if (res.data && res.data.success && res.data.data) {
@@ -114,101 +118,15 @@ const AttendanceReport = () => {
       }
     } catch (err) {
       console.error('Error fetching attendance data:', err);
+      setError('Erreur lors du chargement des données. Veuillez réessayer plus tard.');
       
-      // Generate and use mock data when API fails
-      console.log('Using mock attendance data instead');
-      const mockData = generateMockAttendanceData();
-      setAttendanceData(mockData.attendanceRecords);
-      setSummaryData(mockData.summary);
-      setDepartmentData(mockData.departmentBreakdown);
-      
-      // Don't set an error message in demo mode
-      setError(null);
+      // Reset data on error
+      setAttendanceData([]);
+      setSummaryData({ present: 0, late: 0, absent: 0, total: 0 });
+      setDepartmentData([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Generate mock data for demo purposes
-  const generateMockAttendanceData = () => {
-    // Create mock attendance records with realistic values
-    const mockAttendanceRecords = Array.from({ length: 20 }, (_, i) => ({
-      _id: `emp${i}`,
-      date: new Date().toISOString(),
-      employee: {
-        firstName: `Prénom${i}`,
-        lastName: `Nom${i}`,
-        department: {
-          name: getDepartmentName(i)
-        }
-      },
-      checkIn: `${8 + Math.floor(Math.random() * 2)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-      checkOut: `${16 + Math.floor(Math.random() * 2)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-      status: ['present', 'late', 'absent'][Math.floor(Math.random() * 3)],
-      workHours: (7 + Math.random() * 2).toFixed(1)
-    }));
-
-    // Helper function to get department name
-    function getDepartmentName(index) {
-      const departments = [
-        'KBK FROID', 'KBK ELEC', 'HML', 'REB', 
-        'DEG', 'HAMRA', 'ADM SETIF', 'ADM HMD'
-      ];
-      return departments[index % departments.length];
-    }
-
-    // Create mock summary data
-    const mockSummary = {
-      present: 320,
-      late: 60,
-      absent: 40,
-      total: 20
-    };
-
-    // Create mock department data
-    const mockDepartmentData = [
-      {
-        id: 'dept1',
-        name: 'KBK FROID',
-        present: Math.floor(80 * (0.7 + Math.random() * 0.2)),
-        late: Math.floor(80 * (0.05 + Math.random() * 0.1)),
-        absent: Math.floor(80 * (0.05 + Math.random() * 0.1))
-      },
-      {
-        id: 'dept2',
-        name: 'KBK ELEC',
-        present: Math.floor(80 * (0.7 + Math.random() * 0.2)),
-        late: Math.floor(80 * (0.05 + Math.random() * 0.1)),
-        absent: Math.floor(80 * (0.05 + Math.random() * 0.1))
-      },
-      {
-        id: 'dept3',
-        name: 'HML',
-        present: Math.floor(80 * (0.7 + Math.random() * 0.2)),
-        late: Math.floor(80 * (0.05 + Math.random() * 0.1)),
-        absent: Math.floor(80 * (0.05 + Math.random() * 0.1))
-      },
-      {
-        id: 'dept4',
-        name: 'REB',
-        present: Math.floor(80 * (0.7 + Math.random() * 0.2)),
-        late: Math.floor(80 * (0.05 + Math.random() * 0.1)),
-        absent: Math.floor(80 * (0.05 + Math.random() * 0.1))
-      },
-      {
-        id: 'dept5',
-        name: 'DEG',
-        present: Math.floor(80 * (0.7 + Math.random() * 0.2)),
-        late: Math.floor(80 * (0.05 + Math.random() * 0.1)),
-        absent: Math.floor(80 * (0.05 + Math.random() * 0.1))
-      }
-    ];
-
-    return {
-      attendanceRecords: mockAttendanceRecords,
-      summary: mockSummary,
-      departmentBreakdown: mockDepartmentData
-    };
   };
 
   const handleFilterChange = (field, value) => {

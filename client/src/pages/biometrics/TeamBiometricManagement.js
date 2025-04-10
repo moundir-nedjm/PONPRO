@@ -99,18 +99,48 @@ const TeamBiometricManagement = () => {
   };
 
   const getFilteredEmployees = () => {
+    // Initialize any employees missing biometric status
+    const initializedEmployees = teamMembers.map(emp => {
+      if (!emp.biometricStatus) {
+        return {
+          ...emp,
+          biometricStatus: {
+            faceRecognition: { status: 'not_started', samplesCount: 0 },
+            fingerprint: { status: 'not_started', samplesCount: 0 }
+          }
+        };
+      }
+      
+      // Make sure both biometric types exist
+      const updatedEmp = { ...emp };
+      
+      if (!updatedEmp.biometricStatus.faceRecognition) {
+        updatedEmp.biometricStatus.faceRecognition = { 
+          status: 'not_started', samplesCount: 0 
+        };
+      }
+      
+      if (!updatedEmp.biometricStatus.fingerprint) {
+        updatedEmp.biometricStatus.fingerprint = { 
+          status: 'not_started', samplesCount: 0 
+        };
+      }
+      
+      return updatedEmp;
+    });
+    
     if (activeTab === 0) {
       // All employees tab
-      return teamMembers;
+      return initializedEmployees;
     } else if (activeTab === 1) {
       // Face recognition tab
-      return teamMembers.filter(emp => 
-        emp.biometricStatus.faceRecognition.status !== 'validated'
+      return initializedEmployees.filter(emp => 
+        emp.biometricStatus?.faceRecognition?.status !== 'validated'
       );
     } else {
       // Fingerprint tab
-      return teamMembers.filter(emp => 
-        emp.biometricStatus.fingerprint.status !== 'validated'
+      return initializedEmployees.filter(emp => 
+        emp.biometricStatus?.fingerprint?.status !== 'validated'
       );
     }
   };
@@ -187,9 +217,9 @@ const TeamBiometricManagement = () => {
                     {activeTab === 0 ? (
                       <PersonIcon color="primary" />
                     ) : activeTab === 1 ? (
-                      <BiometricStatusChip status={employee.biometricStatus.faceRecognition.status} />
+                      <BiometricStatusChip status={employee.biometricStatus?.faceRecognition?.status || 'not_started'} />
                     ) : (
-                      <BiometricStatusChip status={employee.biometricStatus.fingerprint.status} />
+                      <BiometricStatusChip status={employee.biometricStatus?.fingerprint?.status || 'not_started'} />
                     )}
                   </ListItemSecondaryAction>
                 </ListItem>
@@ -239,28 +269,28 @@ const TeamBiometricManagement = () => {
                           <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center' }}>
                             <FaceIcon sx={{ mr: 1 }} /> Reconnaissance Faciale
                           </Typography>
-                          <BiometricStatusChip status={selectedEmployee.biometricStatus.faceRecognition.status} />
+                          <BiometricStatusChip status={selectedEmployee.biometricStatus?.faceRecognition?.status || 'not_started'} />
                         </Box>
                         
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Échantillons: {selectedEmployee.biometricStatus.faceRecognition.samplesCount || 0}
+                          Échantillons: {selectedEmployee.biometricStatus?.faceRecognition?.samplesCount || 0}
                         </Typography>
                         
-                        {selectedEmployee.biometricStatus.faceRecognition.enrollmentDate && (
+                        {selectedEmployee.biometricStatus?.faceRecognition?.enrollmentDate && (
                           <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Date d'enregistrement: {new Date(selectedEmployee.biometricStatus.faceRecognition.enrollmentDate).toLocaleDateString()}
+                            Date d'enregistrement: {new Date(selectedEmployee.biometricStatus?.faceRecognition?.enrollmentDate).toLocaleDateString()}
                           </Typography>
                         )}
                         
-                        {selectedEmployee.biometricStatus.faceRecognition.validationDate && (
+                        {selectedEmployee.biometricStatus?.faceRecognition?.validationDate && (
                           <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Date de validation: {new Date(selectedEmployee.biometricStatus.faceRecognition.validationDate).toLocaleDateString()}
+                            Date de validation: {new Date(selectedEmployee.biometricStatus?.faceRecognition?.validationDate).toLocaleDateString()}
                           </Typography>
                         )}
                         
-                        {selectedEmployee.biometricStatus.faceRecognition.validationNotes && (
+                        {selectedEmployee.biometricStatus?.faceRecognition?.validationNotes && (
                           <Alert severity="info" sx={{ mt: 1 }}>
-                            {selectedEmployee.biometricStatus.faceRecognition.validationNotes}
+                            {selectedEmployee.biometricStatus?.faceRecognition?.validationNotes}
                           </Alert>
                         )}
                       </CardContent>
@@ -271,13 +301,13 @@ const TeamBiometricManagement = () => {
                           color="primary"
                           fullWidth
                           onClick={() => handleOpenScanDialog('faceRecognition')}
-                          disabled={selectedEmployee.biometricStatus.faceRecognition.status === 'validated'}
+                          disabled={selectedEmployee.biometricStatus?.faceRecognition?.status === 'validated'}
                         >
                           Scanner le Visage
                         </Button>
                       </CardActions>
                       
-                      {selectedEmployee.biometricStatus.faceRecognition.status === 'completed' && (
+                      {selectedEmployee.biometricStatus?.faceRecognition?.status === 'completed' && (
                         <CardActions>
                           <Button 
                             startIcon={<CheckIcon />} 
@@ -298,7 +328,7 @@ const TeamBiometricManagement = () => {
                         </CardActions>
                       )}
 
-                      {selectedEmployee.biometricStatus.faceRecognition.status === 'completed' && (
+                      {selectedEmployee.biometricStatus?.faceRecognition?.status === 'completed' && (
                         <Box sx={{ px: 2, pb: 2 }}>
                           <TextField
                             label="Notes de validation"
@@ -323,28 +353,28 @@ const TeamBiometricManagement = () => {
                           <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center' }}>
                             <FingerprintIcon sx={{ mr: 1 }} /> Empreinte Digitale
                           </Typography>
-                          <BiometricStatusChip status={selectedEmployee.biometricStatus.fingerprint.status} />
+                          <BiometricStatusChip status={selectedEmployee.biometricStatus?.fingerprint?.status || 'not_started'} />
                         </Box>
                         
                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Échantillons: {selectedEmployee.biometricStatus.fingerprint.samplesCount || 0}
+                          Échantillons: {selectedEmployee.biometricStatus?.fingerprint?.samplesCount || 0}
                         </Typography>
                         
-                        {selectedEmployee.biometricStatus.fingerprint.enrollmentDate && (
+                        {selectedEmployee.biometricStatus?.fingerprint?.enrollmentDate && (
                           <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Date d'enregistrement: {new Date(selectedEmployee.biometricStatus.fingerprint.enrollmentDate).toLocaleDateString()}
+                            Date d'enregistrement: {new Date(selectedEmployee.biometricStatus?.fingerprint?.enrollmentDate).toLocaleDateString()}
                           </Typography>
                         )}
                         
-                        {selectedEmployee.biometricStatus.fingerprint.validationDate && (
+                        {selectedEmployee.biometricStatus?.fingerprint?.validationDate && (
                           <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Date de validation: {new Date(selectedEmployee.biometricStatus.fingerprint.validationDate).toLocaleDateString()}
+                            Date de validation: {new Date(selectedEmployee.biometricStatus?.fingerprint?.validationDate).toLocaleDateString()}
                           </Typography>
                         )}
                         
-                        {selectedEmployee.biometricStatus.fingerprint.validationNotes && (
+                        {selectedEmployee.biometricStatus?.fingerprint?.validationNotes && (
                           <Alert severity="info" sx={{ mt: 1 }}>
-                            {selectedEmployee.biometricStatus.fingerprint.validationNotes}
+                            {selectedEmployee.biometricStatus?.fingerprint?.validationNotes}
                           </Alert>
                         )}
                       </CardContent>
@@ -355,13 +385,13 @@ const TeamBiometricManagement = () => {
                           color="primary"
                           fullWidth
                           onClick={() => handleOpenScanDialog('fingerprint')}
-                          disabled={selectedEmployee.biometricStatus.fingerprint.status === 'validated'}
+                          disabled={selectedEmployee.biometricStatus?.fingerprint?.status === 'validated'}
                         >
                           Scanner l'Empreinte
                         </Button>
                       </CardActions>
                       
-                      {selectedEmployee.biometricStatus.fingerprint.status === 'completed' && (
+                      {selectedEmployee.biometricStatus?.fingerprint?.status === 'completed' && (
                         <CardActions>
                           <Button 
                             startIcon={<CheckIcon />} 
@@ -382,7 +412,7 @@ const TeamBiometricManagement = () => {
                         </CardActions>
                       )}
 
-                      {selectedEmployee.biometricStatus.fingerprint.status === 'completed' && (
+                      {selectedEmployee.biometricStatus?.fingerprint?.status === 'completed' && (
                         <Box sx={{ px: 2, pb: 2 }}>
                           <TextField
                             label="Notes de validation"

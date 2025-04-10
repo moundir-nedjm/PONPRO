@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import {
   Box,
   Typography,
@@ -25,7 +24,14 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Badge
+  Badge,
+  useTheme,
+  useMediaQuery,
+  Card,
+  CardContent,
+  Grid,
+  Stack,
+  Divider
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -45,6 +51,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useBiometrics } from '../../context/BiometricContext';
 import BiometricActions from '../../components/biometrics/BiometricActions';
 import SocketService, { SOCKET_EVENTS } from '../../utils/socket';
+import apiClient from '../../utils/api';
 
 // Biometric status chip component
 const BiometricStatusChip = ({ status }) => {
@@ -118,6 +125,10 @@ const EmployeeList = () => {
 
   const STORAGE_KEY = 'pointgee_deleted_employees';
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+
   // Initialize socket event listeners for this component
   useEffect(() => {
     // Listen for employee events
@@ -162,10 +173,23 @@ const EmployeeList = () => {
       
       setDeletedEmployeeIds(deletedIds);
       
-      // Fetch employees from API
-      const response = await axios.get('http://localhost:5000/api/employees');
+      // Build query parameters based on user role
+      let endpoint = '/employees';
+      
+      // If user is a department head/chef, filter by their assigned projects/departments
+      if (currentUser && (currentUser.role === 'chef' || currentUser.role === 'team_leader') && currentUser.projects && currentUser.projects.length > 0) {
+        // Get list of departments managed by this chef/team leader
+        const departmentParams = currentUser.projects.map(proj => `department=${encodeURIComponent(proj)}`).join('&');
+        endpoint = `/employees?${departmentParams}`;
+        console.log('Fetching employees with filter:', endpoint);
+      }
+      
+      // Fetch employees from API using centralized apiClient
+      const response = await apiClient.get(endpoint);
       
       if (response.data.success) {
+        console.log('Fetched employees:', response.data.data);
+        
         // Filter out locally deleted employees
         const filteredEmployees = response.data.data.filter(
           employee => !deletedIds.includes(employee._id)
@@ -178,14 +202,12 @@ const EmployeeList = () => {
       }
     } catch (err) {
       console.error('Error fetching employees:', err);
-      setError('Erreur lors du chargement des employés');
-      
-      // Fallback to mock data if API call fails
-      // ... existing mock data code ...
+      setError('Erreur lors du chargement des employés. Veuillez réessayer plus tard.');
+      setEmployees([]);
     } finally {
       setLoading(false);
     }
-  }, [refreshCounter]);
+  }, [refreshCounter, currentUser]);
 
   useEffect(() => {
     fetchEmployees();
@@ -212,25 +234,39 @@ const EmployeeList = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      const idToDelete = employeeToDelete.id;
+      const idToDelete = employeeToDelete._id || employeeToDelete.id;
       
+      // Send DELETE request to the server first
+      const response = await apiClient.delete(`/employees/${idToDelete}`);
+      
+      if (!response.data || !response.data.success) {
+        throw new Error('Failed to delete employee from server');
+      }
+      
+      // Only update local state after successful server delete
       setEmployees(prevEmployees => 
-        prevEmployees.filter(emp => emp.id !== idToDelete)
+        prevEmployees.filter(emp => (emp._id || emp.id) !== idToDelete)
       );
       
+      // Store in local storage as backup
       const updatedDeletedIds = [...deletedEmployeeIds, idToDelete];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedDeletedIds));
       
-      console.log('Deleting employee with ID:', idToDelete);
+      console.log('Successfully deleted employee with ID:', idToDelete);
       console.log('Updated deleted IDs:', updatedDeletedIds);
       
       setDeletedEmployeeIds(updatedDeletedIds);
+      
+      // Force refresh of employee list after deletion
+      setRefreshCounter(prev => prev + 1);
       
       setDeleteDialogOpen(false);
       setEmployeeToDelete(null);
     } catch (err) {
       console.error('Error deleting employee:', err);
       setError('Erreur lors de la suppression de l\'employé');
+      setDeleteDialogOpen(false);
+      setEmployeeToDelete(null);
     }
   };
 
@@ -346,10 +382,10 @@ const EmployeeList = () => {
     
     return (
       fullName.includes(searchTermLower) ||
-      employee.employeeId.toLowerCase().includes(searchTermLower) ||
-      employee.email.toLowerCase().includes(searchTermLower) ||
-      employee.position.toLowerCase().includes(searchTermLower) ||
-      employee.department.name.toLowerCase().includes(searchTermLower)
+      (employee.employeeId && employee.employeeId.toLowerCase().includes(searchTermLower)) ||
+      (employee.email && employee.email.toLowerCase().includes(searchTermLower)) ||
+      (employee.position && employee.position.toLowerCase().includes(searchTermLower)) ||
+      (employee.department && employee.department.name && employee.department.name.toLowerCase().includes(searchTermLower))
     );
   });
 
@@ -375,8 +411,15 @@ const EmployeeList = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: 3,
+        gap: 2
+      }}>
         <Typography variant="h5" component="h1">
           {isAdmin ? 'Validation Biométrique des Employés' : 'Gestion des Employés'}
         </Typography>
@@ -387,6 +430,8 @@ const EmployeeList = () => {
             startIcon={<AddIcon />}
             component={Link}
             to="/employees/new"
+            fullWidth={isMobile}
+            sx={{ minHeight: { xs: '42px', sm: 'auto' } }}
           >
             Nouvel Employé
           </Button>
@@ -400,7 +445,7 @@ const EmployeeList = () => {
       )}
 
       <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
           <TextField
             fullWidth
             placeholder="Rechercher un employé..."
@@ -418,98 +463,224 @@ const EmployeeList = () => {
           />
         </Box>
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Nom</TableCell>
-                <TableCell>Email</TableCell>
-                {!isAdmin && <TableCell>Téléphone</TableCell>}
-                <TableCell>Poste</TableCell>
-                <TableCell>Département</TableCell>
-                {!isAdmin && <TableCell>Statut</TableCell>}
-                <TableCell>{isAdmin ? 'Validation Biométrique' : 'Données Biométriques'}</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedEmployees.map((employee) => (
-                <TableRow key={employee.id}>
-                  <TableCell>{employee.employeeId}</TableCell>
-                  <TableCell>
-                    {employee.firstName} {employee.lastName}
-                  </TableCell>
-                  <TableCell>{employee.email}</TableCell>
-                  {!isAdmin && <TableCell>{employee.phone}</TableCell>}
-                  <TableCell>{employee.position}</TableCell>
-                  <TableCell>{employee.department.name}</TableCell>
-                  {!isAdmin && (
-                    <TableCell>
-                      <Chip
-                        label={employee.active ? 'Actif' : 'Inactif'}
-                        color={employee.active ? 'success' : 'default'}
-                        size="small"
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <BiometricActions 
-                      employee={employee}
-                      onScanComplete={isAdmin ? null : handleBiometricScanComplete}
-                      onValidationRequest={handleBiometricValidation}
-                      canValidate={canValidateBiometrics}
-                      compact={true}
-                      adminMode={isAdmin}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Tooltip title="Voir les détails">
-                      <IconButton
-                        component={Link}
-                        to={`/employees/${employee.id}`}
-                        size="small"
-                        color="primary"
-                      >
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    {currentUser.role === 'admin' && (
-                      <>
-                        <Tooltip title="Modifier">
+        {isMobile ? (
+          // Card view for mobile
+          <Box sx={{ p: { xs: 1, sm: 2 } }}>
+            {paginatedEmployees.length > 0 ? (
+              paginatedEmployees.map((employee) => (
+                <Card key={employee.id} sx={{ mb: 2, overflow: 'visible' }}>
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack spacing={1}>
+                      <Typography variant="h6">
+                        {employee.firstName} {employee.lastName}
+                      </Typography>
+                      
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">ID:</Typography>
+                        <Typography variant="body2">{employee.employeeId}</Typography>
+                      </Box>
+                      
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Email:</Typography>
+                        <Typography variant="body2" 
+                          sx={{ 
+                            wordBreak: 'break-word', 
+                            overflowWrap: 'break-word'
+                          }}
+                        >
+                          {employee.email}
+                        </Typography>
+                      </Box>
+                      
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Poste:</Typography>
+                        <Typography variant="body2">{employee.position}</Typography>
+                      </Box>
+                      
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Département:</Typography>
+                        <Typography variant="body2">{employee.department?.name || 'Non assigné'}</Typography>
+                      </Box>
+                      
+                      {!isAdmin && (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Statut:</Typography>
+                          <Box sx={{ mt: 0.5 }}>
+                            <Chip
+                              label={employee.active ? 'Actif' : 'Inactif'}
+                              color={employee.active ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {isAdmin ? 'Validation Biométrique:' : 'Données Biométriques:'}
+                        </Typography>
+                        <Box sx={{ mt: 1 }}>
+                          <BiometricActions 
+                            employee={employee}
+                            onScanComplete={isAdmin ? null : handleBiometricScanComplete}
+                            onValidationRequest={handleBiometricValidation}
+                            canValidate={canValidateBiometrics}
+                            compact={false}
+                            adminMode={isAdmin}
+                          />
+                        </Box>
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, gap: 1 }}>
+                        <Tooltip title="Voir les détails">
                           <IconButton
                             component={Link}
-                            to={`/employees/edit/${employee.id}`}
+                            to={`/employees/${employee._id || employee.id}`}
                             size="small"
                             color="primary"
+                            sx={{ padding: 1 }}
                           >
-                            <EditIcon fontSize="small" />
+                            <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Supprimer">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleDeleteClick(employee)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {paginatedEmployees.length === 0 && (
+                        {currentUser.role === 'admin' && (
+                          <>
+                            <Tooltip title="Modifier">
+                              <IconButton
+                                component={Link}
+                                to={`/employees/edit/${employee._id || employee.id}`}
+                                size="small"
+                                color="primary"
+                                sx={{ padding: 1 }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Supprimer">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleDeleteClick(employee)}
+                                sx={{ padding: 1 }}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography>Aucun employé trouvé</Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          // Table view for tablet and desktop
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={10} align="center">
-                    Aucun employé trouvé
-                  </TableCell>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Nom</TableCell>
+                  <TableCell>Email</TableCell>
+                  {!isTablet && !isAdmin && <TableCell>Téléphone</TableCell>}
+                  <TableCell>Poste</TableCell>
+                  <TableCell>Département</TableCell>
+                  {!isAdmin && <TableCell>Statut</TableCell>}
+                  <TableCell>{isAdmin ? 'Validation Biométrique' : 'Données Biométriques'}</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {paginatedEmployees.length > 0 ? (
+                  paginatedEmployees.map((employee) => (
+                    <TableRow key={employee.id}>
+                      <TableCell>{employee.employeeId}</TableCell>
+                      <TableCell>
+                        {employee.firstName} {employee.lastName}
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {employee.email}
+                      </TableCell>
+                      {!isTablet && !isAdmin && <TableCell>{employee.phone}</TableCell>}
+                      <TableCell>{employee.position}</TableCell>
+                      <TableCell>{employee.department?.name || 'Non assigné'}</TableCell>
+                      {!isAdmin && (
+                        <TableCell>
+                          <Chip
+                            label={employee.active ? 'Actif' : 'Inactif'}
+                            color={employee.active ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <BiometricActions 
+                          employee={employee}
+                          onScanComplete={isAdmin ? null : handleBiometricScanComplete}
+                          onValidationRequest={handleBiometricValidation}
+                          canValidate={canValidateBiometrics}
+                          compact={true}
+                          adminMode={isAdmin}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Voir les détails">
+                          <IconButton
+                            component={Link}
+                            to={`/employees/${employee._id || employee.id}`}
+                            size="small"
+                            color="primary"
+                            sx={{ padding: isTablet ? 1 : undefined }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {currentUser.role === 'admin' && (
+                          <>
+                            <Tooltip title="Modifier">
+                              <IconButton
+                                component={Link}
+                                to={`/employees/edit/${employee._id || employee.id}`}
+                                size="small"
+                                color="primary"
+                                sx={{ padding: isTablet ? 1 : undefined }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Supprimer">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleDeleteClick(employee)}
+                                sx={{ padding: isTablet ? 1 : undefined }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={isTablet ? 9 : 10} align="center">
+                      Aucun employé trouvé
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+        
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
@@ -518,7 +689,7 @@ const EmployeeList = () => {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          labelRowsPerPage="Lignes par page:"
+          labelRowsPerPage={isMobile ? "" : "Lignes par page:"}
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
         />
       </Paper>
@@ -529,6 +700,7 @@ const EmployeeList = () => {
         onClose={handleDeleteCancel}
         aria-labelledby="delete-dialog-title"
         aria-describedby="delete-dialog-description"
+        fullScreen={isMobile}
       >
         <DialogTitle id="delete-dialog-title">
           Confirmer la suppression
@@ -557,6 +729,7 @@ const EmployeeList = () => {
         open={bioValidationDialog.open}
         onClose={handleBioValidationClose}
         aria-labelledby="bio-validation-dialog-title"
+        fullScreen={isMobile}
       >
         <DialogTitle id="bio-validation-dialog-title">
           Validation des données biométriques

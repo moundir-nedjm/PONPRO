@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -71,7 +72,7 @@ const LeaveReport = () => {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await axios.get('/api/departments');
+        const res = await apiClient.get('/departments');
         setDepartments(res.data.data || []);
       } catch (err) {
         console.error('Error fetching departments:', err);
@@ -89,21 +90,24 @@ const LeaveReport = () => {
     try {
       setLoading(true);
       
-      // Format dates for API
-      const startDate = format(filters.startDate, 'yyyy-MM-dd');
-      const endDate = format(filters.endDate, 'yyyy-MM-dd');
+      // Create URL parameters
+      let url = `/reports/leave?`;
       
-      // Build query params
-      let url = `/api/reports/leaves?startDate=${startDate}&endDate=${endDate}`;
-      if (filters.department !== 'all') {
-        url += `&department=${filters.department}`;
+      if (filters.startDate) {
+        url += `startDate=${filters.startDate.toISOString()}&`;
+      }
+      if (filters.endDate) {
+        url += `endDate=${filters.endDate.toISOString()}&`;
+      }
+      if (filters.department && filters.department !== 'all') {
+        url += `department=${filters.department}&`;
       }
       if (filters.status !== 'all') {
-        url += `&status=${filters.status}`;
+        url += `status=${filters.status}`;
       }
       
       console.log('Fetching leave report from:', url);
-      const res = await axios.get(url, { timeout: 5000 }); // Add timeout to prevent long waiting
+      const res = await apiClient.get(url, { timeout: 5000 }); // Add timeout to prevent long waiting
       console.log('Leave report data:', res.data);
       
       if (res.data && res.data.success && res.data.data) {
@@ -123,134 +127,27 @@ const LeaveReport = () => {
       }
     } catch (err) {
       console.error('Error fetching leave data:', err);
+      setError('Erreur lors du chargement des données. Veuillez réessayer plus tard.');
       
-      // Generate and use mock data when API fails
-      console.log('Using mock leave data instead');
-      const mockData = generateMockLeaveData();
-      setLeaveData(mockData.leaveRecords);
-      setSummaryData(mockData.summary);
-      setTypeData(mockData.typeBreakdown);
-      setDepartmentData(mockData.departmentBreakdown);
-      
-      // Don't set an error message in demo mode
-      setError(null);
+      // Reset data on error
+      setLeaveData([]);
+      setSummaryData({
+        totalLeaves: 0,
+        approvedLeaves: 0,
+        pendingLeaves: 0,
+        rejectedLeaves: 0,
+        annualLeaves: 0,
+        sickLeaves: 0,
+        personalLeaves: 0,
+        unpaidLeaves: 0,
+        maternityLeaves: 0,
+        totalDays: 0
+      });
+      setTypeData([]);
+      setDepartmentData([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Generate mock data for demo purposes when server is not available
-  const generateMockLeaveData = () => {
-    const leaveTypes = ['annuel', 'maladie', 'personnel', 'sans solde', 'maternité'];
-    const leaveStatus = ['approuvé', 'en attente', 'refusé'];
-    
-    // Create mock leave records
-    const mockLeaveRecords = Array.from({ length: 20 }, (_, i) => {
-      const type = leaveTypes[Math.floor(Math.random() * leaveTypes.length)];
-      const status = leaveStatus[Math.floor(Math.random() * leaveStatus.length)];
-      const days = Math.floor(Math.random() * 10) + 1;
-      return {
-        id: `leave${i}`,
-        employeeId: `EMP${i + 100}`,
-        employeeName: `Prénom${i} Nom${i}`,
-        department: getDepartmentName(i),
-        leaveType: type,
-        startDate: format(addDays(new Date(), -Math.floor(Math.random() * 30)), 'yyyy-MM-dd'),
-        endDate: format(addDays(new Date(), Math.floor(Math.random() * 30)), 'yyyy-MM-dd'),
-        days: days,
-        status: status,
-        reason: `Raison de congé ${i + 1}`
-      };
-    });
-
-    // Helper function to get department name
-    function getDepartmentName(index) {
-      const departments = [
-        'KBK FROID', 'KBK ELEC', 'HML', 'REB', 
-        'DEG', 'HAMRA', 'ADM SETIF', 'ADM HMD'
-      ];
-      return departments[index % departments.length];
-    }
-
-    // Create mock summary data
-    const mockSummary = {
-      totalLeaves: 65,
-      approvedLeaves: 45,
-      pendingLeaves: 15,
-      rejectedLeaves: 5,
-      annualLeaves: 30,
-      sickLeaves: 15,
-      personalLeaves: 10,
-      unpaidLeaves: 5,
-      maternityLeaves: 5,
-      totalDays: 180
-    };
-
-    // Create mock department data
-    const mockDepartmentData = [
-      {
-        id: 'dept1',
-        name: 'KBK FROID',
-        totalLeaves: Math.floor(Math.random() * 20) + 5,
-        totalDays: Math.floor(Math.random() * 50) + 20,
-        annualLeaves: Math.floor(Math.random() * 10) + 5,
-        sickLeaves: Math.floor(Math.random() * 5) + 1,
-        otherLeaves: Math.floor(Math.random() * 5) + 1
-      },
-      {
-        id: 'dept2',
-        name: 'KBK ELEC',
-        totalLeaves: Math.floor(Math.random() * 20) + 5,
-        totalDays: Math.floor(Math.random() * 50) + 20,
-        annualLeaves: Math.floor(Math.random() * 10) + 5,
-        sickLeaves: Math.floor(Math.random() * 5) + 1,
-        otherLeaves: Math.floor(Math.random() * 5) + 1
-      },
-      {
-        id: 'dept3',
-        name: 'HML',
-        totalLeaves: Math.floor(Math.random() * 20) + 5,
-        totalDays: Math.floor(Math.random() * 50) + 20,
-        annualLeaves: Math.floor(Math.random() * 10) + 5,
-        sickLeaves: Math.floor(Math.random() * 5) + 1,
-        otherLeaves: Math.floor(Math.random() * 5) + 1
-      },
-      {
-        id: 'dept4',
-        name: 'REB',
-        totalLeaves: Math.floor(Math.random() * 20) + 5,
-        totalDays: Math.floor(Math.random() * 50) + 20,
-        annualLeaves: Math.floor(Math.random() * 10) + 5,
-        sickLeaves: Math.floor(Math.random() * 5) + 1,
-        otherLeaves: Math.floor(Math.random() * 5) + 1
-      },
-      {
-        id: 'dept5',
-        name: 'DEG',
-        totalLeaves: Math.floor(Math.random() * 20) + 5,
-        totalDays: Math.floor(Math.random() * 50) + 20,
-        annualLeaves: Math.floor(Math.random() * 10) + 5,
-        sickLeaves: Math.floor(Math.random() * 5) + 1,
-        otherLeaves: Math.floor(Math.random() * 5) + 1
-      }
-    ];
-    
-    // Create mock type data
-    const mockTypeData = [
-      { name: 'Congé Annuel', value: 30, color: '#4caf50' },
-      { name: 'Congé Maladie', value: 15, color: '#ff9800' },
-      { name: 'Congé Personnel', value: 10, color: '#f44336' },
-      { name: 'Congé Sans Solde', value: 5, color: '#9e9e9e' },
-      { name: 'Congé Maternité', value: 5, color: '#2196f3' },
-      { name: 'Autres', value: 5, color: '#673ab7' }
-    ];
-
-    return {
-      leaveRecords: mockLeaveRecords,
-      summary: mockSummary,
-      departmentBreakdown: mockDepartmentData,
-      typeBreakdown: mockTypeData
-    };
   };
 
   const handleFilterChange = (field, value) => {

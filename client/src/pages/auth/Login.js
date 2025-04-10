@@ -45,8 +45,12 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loginMethod, setLoginMethod] = useState('email');
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, error, PROJECTS } = useAuth();
+  const [localError, setLocalError] = useState(null);
+  const { login, error: authError, PROJECTS } = useAuth();
   const navigate = useNavigate();
+
+  // Use both local and auth context errors
+  const error = localError || authError;
 
   const formik = useFormik({
     initialValues: {
@@ -64,11 +68,18 @@ const Login = () => {
         .required('ID employé requis') : Yup.string()
     }),
     onSubmit: async (values) => {
-      // Use the appropriate login method based on tab selection
-      const loginIdentifier = loginMethod === 'email' ? values.email : values.employeeId;
-      const success = await login(loginIdentifier, values.password);
-      if (success) {
-        navigate('/dashboard');
+      const identifier = values.email || values.employeeId;
+      console.log(`Submitting login form with: ${identifier}`);
+      
+      try {
+        setLocalError('');
+        const success = await login(identifier, values.password);
+        if (success) {
+          navigate('/dashboard');
+        }
+      } catch (err) {
+        console.error('Login submission error:', err);
+        setLocalError('Erreur de connexion. Veuillez réessayer.');
       }
     }
   });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   AppBar, 
@@ -54,6 +54,8 @@ import {
 } from '@mui/icons-material';
 import Logo from './Logo';
 import { useAuth } from '../../context/AuthContext';
+import SocketService from '../../services/SocketService';
+import apiClient from '../../services/apiClient';
 
 // Styled components
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
@@ -173,6 +175,35 @@ const Header = ({ open, toggleDrawer }) => {
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState(null);
   const [quickActionsAnchorEl, setQuickActionsAnchorEl] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [organizationName, setOrganizationName] = useState('POINPRO');
+
+  // Subscribe to organization name changes
+  useEffect(() => {
+    const handleOrgNameChange = (newName) => {
+      setOrganizationName(newName);
+    };
+
+    // Listen for organization name changes
+    SocketService.on('organization-updated', handleOrgNameChange);
+
+    // Fetch initial organization name
+    const fetchOrgName = async () => {
+      try {
+        const response = await apiClient.get('/api/settings/organization');
+        if (response.data.success) {
+          setOrganizationName(response.data.data.name);
+        }
+      } catch (err) {
+        console.error('Error fetching organization name:', err);
+      }
+    };
+
+    fetchOrgName();
+
+    return () => {
+      SocketService.off('organization-updated', handleOrgNameChange);
+    };
+  }, []);
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -286,7 +317,7 @@ const Header = ({ open, toggleDrawer }) => {
                 ml: 1
               }}
             >
-              POINPRO
+              {organizationName}
             </Typography>
           </Link>
           

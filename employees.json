@@ -1,0 +1,10 @@
+[
+  {
+    "key": "employee:1",
+    "value": "{\"id\":\"1\",\"name\":\"John Doe\",\"email\":\"john@example.com\",\"position\":\"Developer\",\"departmentId\":\"1\",\"createdAt\":\"2025-04-06T22:45:00.000Z\",\"updatedAt\":\"2025-04-06T22:45:00.000Z\"}"
+  },
+  {
+    "key": "employee:2",
+    "value": "{\"id\":\"2\",\"name\":\"Jane Smith\",\"email\":\"jane@example.com\",\"position\":\"Designer\",\"departmentId\":\"2\",\"createdAt\":\"2025-04-06T22:45:00.000Z\",\"updatedAt\":\"2025-04-06T22:45:00.000Z\"}"
+  }
+] 

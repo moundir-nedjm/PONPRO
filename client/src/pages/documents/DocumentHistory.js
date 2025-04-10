@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -6,7 +6,8 @@ import {
   IconButton,
   Box,
   Typography,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import Timeline from '@mui/lab/Timeline';
 import TimelineItem from '@mui/lab/TimelineItem';
@@ -24,43 +25,45 @@ import {
   Cancel as CancelIcon,
   Help as HelpIcon,
   History as HistoryIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
+import apiClient from '../../utils/api';
 
-const DocumentHistory = ({ open, onClose, documentId, history = [] }) => {
-  // This would normally fetch history from an API based on documentId
-  // For now, we'll use mock data if no history is provided
-  const mockHistory = [
-    {
-      id: '1',
-      documentId: documentId,
-      action: 'upload',
-      status: 'pending',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // 5 days ago
-      user: 'John Doe',
-      details: 'Document ajouté au système'
-    },
-    {
-      id: '2',
-      documentId: documentId,
-      action: 'status_change',
-      status: 'verified',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(), // 3 days ago
-      user: 'Admin User',
-      details: 'Document vérifié par l\'administrateur'
-    },
-    {
-      id: '3',
-      documentId: documentId,
-      action: 'download',
-      status: 'verified',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-      user: 'Jane Smith',
-      details: 'Document téléchargé par un utilisateur'
+const DocumentHistory = ({ open, onClose, documentId }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [documentHistory, setDocumentHistory] = useState([]);
+
+  useEffect(() => {
+    if (open && documentId) {
+      fetchDocumentHistory();
     }
-  ];
+  }, [open, documentId]);
 
-  const documentHistory = history.length > 0 ? history : mockHistory;
+  const fetchDocumentHistory = async () => {
+    if (!documentId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient.get(`/documents/${documentId}/history`);
+      
+      if (response.data && response.data.success) {
+        setDocumentHistory(response.data.data || []);
+      } else {
+        setError('Erreur lors du chargement de l\'historique');
+        setDocumentHistory([]);
+      }
+    } catch (err) {
+      console.error('Error fetching document history:', err);
+      setError('Erreur lors du chargement de l\'historique');
+      setDocumentHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const getActionIcon = (action, status) => {
     switch (action) {
@@ -162,34 +165,50 @@ const DocumentHistory = ({ open, onClose, documentId, history = [] }) => {
       </DialogTitle>
       
       <DialogContent>
-        <Timeline position="alternate">
-          {documentHistory.map((item) => (
-            <TimelineItem key={item.id}>
-              <TimelineOppositeContent color="text.secondary">
-                {formatDate(item.timestamp)}
-              </TimelineOppositeContent>
-              <TimelineSeparator>
-                <TimelineDot color={getActionColor(item.action, item.status)}>
-                  {getActionIcon(item.action, item.status)}
-                </TimelineDot>
-                <TimelineConnector />
-              </TimelineSeparator>
-              <TimelineContent>
-                <Paper elevation={1} sx={{ p: 2 }}>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {getActionText(item)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {item.details}
-                  </Typography>
-                  <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                    Par: {item.user}
-                  </Typography>
-                </Paper>
-              </TimelineContent>
-            </TimelineItem>
-          ))}
-        </Timeline>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Box sx={{ textAlign: 'center', p: 4 }}>
+            <InfoIcon color="error" sx={{ fontSize: 40, mb: 2 }} />
+            <Typography color="error">{error}</Typography>
+          </Box>
+        ) : documentHistory.length === 0 ? (
+          <Box sx={{ textAlign: 'center', p: 4 }}>
+            <InfoIcon color="info" sx={{ fontSize: 40, mb: 2 }} />
+            <Typography>Aucun historique disponible pour ce document</Typography>
+          </Box>
+        ) : (
+          <Timeline position="alternate">
+            {documentHistory.map((item) => (
+              <TimelineItem key={item.id}>
+                <TimelineOppositeContent color="text.secondary">
+                  {formatDate(item.timestamp)}
+                </TimelineOppositeContent>
+                <TimelineSeparator>
+                  <TimelineDot color={getActionColor(item.action, item.status)}>
+                    {getActionIcon(item.action, item.status)}
+                  </TimelineDot>
+                  <TimelineConnector />
+                </TimelineSeparator>
+                <TimelineContent>
+                  <Paper elevation={1} sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {getActionText(item)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {item.details}
+                    </Typography>
+                    <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                      Par: {item.user}
+                    </Typography>
+                  </Paper>
+                </TimelineContent>
+              </TimelineItem>
+            ))}
+          </Timeline>
+        )}
       </DialogContent>
     </Dialog>
   );

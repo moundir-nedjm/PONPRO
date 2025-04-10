@@ -107,54 +107,38 @@ export const AuthProvider = ({ children }) => {
     }
   ];
 
-  const login = async (identifier, password) => {
+  const login = async (email, password) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Try to authenticate with real API first
-      try {
-        const response = await axios.post('http://localhost:5000/api/auth/login', {
-          identifier,
-          password
-        });
-        
-        if (response.data.success) {
-          // Store token if available
-          if (response.data.token) {
-            localStorage.setItem('authToken', response.data.token);
-          }
-          
-          // Set user data
-          setCurrentUser(response.data.user);
-          setIsAuthenticated(true);
-          setLoading(false);
-          return true;
+      console.log(`Attempting login with: ${email}`);
+      const response = await axios.post('http://localhost:3002/api/auth/login', {
+        identifier: email,
+        password
+      });
+      
+      console.log('Login response:', response.data);
+      
+      if (response.data.success) {
+        // Store token if available
+        if (response.data.token) {
+          localStorage.setItem('authToken', response.data.token);
         }
-      } catch (apiError) {
-        console.log('API authentication failed, falling back to mock data:', apiError);
-        // Continue to mock authentication if API fails
-      }
-      
-      // Fall back to mock authentication
-      const user = mockUsers.find(
-        u => (u.email === identifier || u.id === identifier) && u.password === password
-      );
-      
-      if (user) {
-        // Remove password from user object before storing
-        const { password, ...userWithoutPassword } = user;
-        setCurrentUser(userWithoutPassword);
+        
+        // Set user data
+        setCurrentUser(response.data.user);
         setIsAuthenticated(true);
         setLoading(false);
         return true;
       } else {
-        setError('Identifiants invalides');
+        setError(response.data.message || 'Login failed');
         setLoading(false);
         return false;
       }
     } catch (err) {
-      setError('Erreur de connexion');
+      console.error('Login error:', err.response ? err.response.data : err.message);
+      setError(err.response?.data?.message || 'Erreur de connexion');
       setLoading(false);
       return false;
     }

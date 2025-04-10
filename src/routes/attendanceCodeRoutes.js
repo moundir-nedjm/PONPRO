@@ -11,19 +11,18 @@ const router = express.Router();
 
 const { protect, authorize } = require('../middleware/auth');
 
-// Apply protection to all routes
-router.use(protect);
+// Public route for getting all codes
+router.get('/', getAttendanceCodes);
 
-// Routes
+// Protected routes
 router
   .route('/')
-  .get(getAttendanceCodes)
-  .post(authorize('admin', 'manager'), createAttendanceCode);
+  .post(protect, authorize('admin', 'manager'), createAttendanceCode);
 
 router
   .route('/:id')
   .get(getAttendanceCode)
-  .put(authorize('admin', 'manager'), updateAttendanceCode)
-  .delete(authorize('admin'), deleteAttendanceCode);
+  .put(protect, authorize('admin', 'manager'), updateAttendanceCode)
+  .delete(protect, authorize('admin'), deleteAttendanceCode);
 
 module.exports = router; 

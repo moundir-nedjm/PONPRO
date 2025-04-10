@@ -36,7 +36,10 @@ import {
   Avatar,
   Badge,
   Tabs,
-  Tab
+  Tab,
+  useTheme,
+  useMediaQuery,
+  Stack
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -53,6 +56,7 @@ import {
   Print as PrintIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
+import { useAuth } from '../../context/AuthContext';
 
 const DepartmentList = () => {
   const [departments, setDepartments] = useState([]);
@@ -71,6 +75,13 @@ const DepartmentList = () => {
     inactive: 0,
     totalEmployees: 0
   });
+  
+  // Get auth context at the component level, not inside functions
+  const { currentUser } = useAuth();
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
 
   useEffect(() => {
     fetchDepartments();
@@ -84,24 +95,68 @@ const DepartmentList = () => {
   const fetchDepartments = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/departments');
-      if (response.data.success) {
-        setDepartments(response.data.data);
-        setFilteredDepartments(response.data.data);
-        setError(null);
+      
+      // Use currentUser from the component scope instead of calling useAuth() here
+      let departmentsData = [];
+      
+      if (currentUser?.role === 'chef' && currentUser?.projects) {
+        // For chef d'equipe, only fetch their departments
+        console.log('Chef d\'équipe user detected, filtering departments', currentUser.projects);
+        
+        // Try to fetch only departments that match the chef's projects
+        try {
+          // If projects field contains department names, use it to filter
+          const chefDepartments = currentUser.projects.join(',');
+          const response = await apiClient.get(`/departments?names=${chefDepartments}`);
+          if (response.data.success) {
+            departmentsData = response.data.data;
+            console.log('Fetched filtered departments for chef:', departmentsData);
+          }
+        } catch (error) {
+          console.error('Error fetching chef departments:', error);
+          // Fall back to all departments and filter client-side
+          const allDepartmentsResponse = await apiClient.get('/departments');
+          if (allDepartmentsResponse.data.success) {
+            // Filter departments to only include those in the chef's projects
+            departmentsData = allDepartmentsResponse.data.data.filter(dept => 
+              currentUser.projects.includes(dept.name)
+            );
+            console.log('Filtered departments client-side:', departmentsData);
+          }
+        }
       } else {
-        throw new Error('Failed to fetch departments');
+        // For admin users, fetch all departments
+        const response = await apiClient.get('/departments');
+        if (response.data.success) {
+          departmentsData = response.data.data;
+        } else {
+          throw new Error('Failed to fetch departments');
+        }
       }
+      
+      setDepartments(departmentsData);
+      setFilteredDepartments(departmentsData);
+      
+      // Calculate statistics
+      updateStats(departmentsData);
+      
+      setError(null);
     } catch (err) {
       console.error('Error fetching departments:', err);
       
       // Generate mock departments for demo
       const mockDepartments = generateMockDepartments();
-      setDepartments(mockDepartments);
-      setFilteredDepartments(mockDepartments);
+      
+      // Filter mock departments for chef d'équipe
+      const filteredMockDepartments = currentUser?.role === 'chef' && currentUser?.projects 
+        ? mockDepartments.filter(dept => currentUser.projects.includes(dept.name))
+        : mockDepartments;
+      
+      setDepartments(filteredMockDepartments);
+      setFilteredDepartments(filteredMockDepartments);
       
       // Calculate statistics from mock data
-      updateStats(mockDepartments);
+      updateStats(filteredMockDepartments);
       
       // Don't set an error message
       setError(null);
@@ -318,16 +373,23 @@ const DepartmentList = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: { xs: 2, sm: 3 },
+        gap: { xs: 1, sm: 0 }
+      }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: { xs: 0, sm: 1 } }}>
           Départements
         </Typography>
-        <Box>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             onClick={fetchDepartments}
             startIcon={<RefreshIcon />}
-            sx={{ mr: 1 }}
+            size={isMobile ? "small" : "medium"}
           >
             Actualiser
           </Button>
@@ -337,44 +399,45 @@ const DepartmentList = () => {
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
+            size={isMobile ? "small" : "medium"}
           >
             Ajouter un Département
           </Button>
         </Box>
       </Box>
 
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
+      <Grid container spacing={2} sx={{ mb: { xs: 2, sm: 3 } }}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography color="inherit" variant="subtitle1" gutterBottom>
+                <Typography color="inherit" variant={isMobile ? "body2" : "subtitle1"} gutterBottom>
                   Total Départements
                 </Typography>
-                <Avatar sx={{ bgcolor: 'primary.dark' }}>
-                  <BusinessIcon />
+                <Avatar sx={{ bgcolor: 'primary.dark', width: isMobile ? 24 : 32, height: isMobile ? 24 : 32 }}>
+                  <BusinessIcon fontSize={isMobile ? "small" : "medium"} />
                 </Avatar>
               </Box>
-              <Typography variant="h4" component="div">
+              <Typography variant={isMobile ? "h5" : "h4"} component="div">
                 {stats.total}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography color="inherit" variant="subtitle1" gutterBottom>
+                <Typography color="inherit" variant={isMobile ? "body2" : "subtitle1"} gutterBottom>
                   Départements Actifs
                 </Typography>
-                <Avatar sx={{ bgcolor: 'success.dark' }}>
+                <Avatar sx={{ bgcolor: 'success.dark', width: isMobile ? 24 : 32, height: isMobile ? 24 : 32 }}>
                   <Badge badgeContent={stats.active} color="success">
-                    <BusinessIcon />
+                    <BusinessIcon fontSize={isMobile ? "small" : "medium"} />
                   </Badge>
                 </Avatar>
               </Box>
-              <Typography variant="h4" component="div">
+              <Typography variant={isMobile ? "h5" : "h4"} component="div">
                 {stats.active}
               </Typography>
               <Typography variant="body2" color="inherit">
@@ -383,20 +446,20 @@ const DepartmentList = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography color="inherit" variant="subtitle1" gutterBottom>
-                  Départements Inactifs
+                <Typography color="inherit" variant={isMobile ? "body2" : "subtitle1"} gutterBottom>
+                  Dép. Inactifs
                 </Typography>
-                <Avatar sx={{ bgcolor: 'error.dark' }}>
+                <Avatar sx={{ bgcolor: 'error.dark', width: isMobile ? 24 : 32, height: isMobile ? 24 : 32 }}>
                   <Badge badgeContent={stats.inactive} color="error">
-                    <BusinessIcon />
+                    <BusinessIcon fontSize={isMobile ? "small" : "medium"} />
                   </Badge>
                 </Avatar>
               </Box>
-              <Typography variant="h4" component="div">
+              <Typography variant={isMobile ? "h5" : "h4"} component="div">
                 {stats.inactive}
               </Typography>
               <Typography variant="body2" color="inherit">
@@ -405,29 +468,29 @@ const DepartmentList = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography color="text.secondary" variant="subtitle1" gutterBottom>
+                <Typography color="text.secondary" variant={isMobile ? "body2" : "subtitle1"} gutterBottom>
                   Total Employés
                 </Typography>
-                <Avatar>
-                  <GroupIcon />
+                <Avatar sx={{ width: isMobile ? 24 : 32, height: isMobile ? 24 : 32 }}>
+                  <GroupIcon fontSize={isMobile ? "small" : "medium"} />
                 </Avatar>
               </Box>
-              <Typography variant="h4" component="div">
+              <Typography variant={isMobile ? "h5" : "h4"} component="div">
                 {stats.totalEmployees}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {stats.total > 0 ? `${Math.round(stats.totalEmployees / stats.total)} par département` : '0 par département'}
+                {stats.total > 0 ? `${Math.round(stats.totalEmployees / stats.total)} par dép.` : '0 par dép.'}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: { xs: 1, sm: 2 }, mb: 3 }}>
         <Box sx={{ mb: 2 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>
@@ -437,6 +500,7 @@ const DepartmentList = () => {
                 placeholder="Rechercher des départements..."
                 value={searchTerm}
                 onChange={handleSearchChange}
+                size={isMobile ? "small" : "medium"}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -447,12 +511,17 @@ const DepartmentList = () => {
               />
             </Grid>
             <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: { xs: 'flex-start', md: 'flex-end' },
+                flexWrap: 'wrap',
+                gap: 1
+              }}>
                 <Button
                   variant="outlined"
                   startIcon={<DownloadIcon />}
                   onClick={exportToCsv}
-                  sx={{ mr: 1 }}
+                  size={isMobile ? "small" : "medium"}
                 >
                   Exporter
                 </Button>
@@ -460,6 +529,7 @@ const DepartmentList = () => {
                   variant="outlined"
                   startIcon={<PrintIcon />}
                   onClick={() => window.print()}
+                  size={isMobile ? "small" : "medium"}
                 >
                   Imprimer
                 </Button>
@@ -473,6 +543,7 @@ const DepartmentList = () => {
           onChange={handleTabChange}
           indicatorColor="primary"
           textColor="primary"
+          variant={isMobile ? "fullWidth" : "standard"}
           sx={{ mb: 2 }}
         >
           <Tab label="Tous" />
@@ -489,24 +560,16 @@ const DepartmentList = () => {
             {error}
           </Alert>
         ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Nom</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Employés</TableCell>
-                  <TableCell>Statut</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredDepartments.length > 0 ? (
-                  filteredDepartments.map((department) => (
-                    <TableRow key={department._id}>
-                      <TableCell>
+          isMobile ? (
+            // Mobile view with cards
+            <Box>
+              {filteredDepartments.length > 0 ? (
+                filteredDepartments.map((department) => (
+                  <Card key={department._id} sx={{ mb: 2 }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ bgcolor: 'primary.light', mr: 2, width: 30, height: 30 }}>
+                          <Avatar sx={{ bgcolor: 'primary.light', mr: 1, width: 28, height: 28 }}>
                             <BusinessIcon fontSize="small" />
                           </Avatar>
                           <Link to={`/departments/${department._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -515,72 +578,165 @@ const DepartmentList = () => {
                             </Typography>
                           </Link>
                         </Box>
-                      </TableCell>
-                      <TableCell>{department.description}</TableCell>
-                      <TableCell>
-                        <Chip
-                          icon={<GroupIcon />}
-                          label={department.employeeCount || 0}
-                          size="small"
-                          color={department.employeeCount > 0 ? "primary" : "default"}
-                        />
-                      </TableCell>
-                      <TableCell>
                         <Chip
                           size="small"
                           label={department.active ? 'Actif' : 'Inactif'}
                           color={department.active ? 'success' : 'default'}
                         />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Tooltip title="Voir">
+                      </Box>
+                      
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {department.description}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Chip
+                          icon={<GroupIcon />}
+                          label={`${department.employeeCount || 0} employés`}
+                          size="small"
+                          color={department.employeeCount > 0 ? "primary" : "default"}
+                        />
+                        
+                        <Box>
                           <IconButton
                             component={Link}
                             to={`/departments/${department._id}`}
                             color="primary"
                             size="small"
                           >
-                            <VisibilityIcon />
+                            <VisibilityIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Modifier">
                           <IconButton
                             component={Link}
                             to={`/departments/edit/${department._id}`}
                             color="primary"
                             size="small"
                           >
-                            <EditIcon />
+                            <EditIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
-                        <Tooltip title={department.employeeCount > 0 ? 
-                          "Ce département contient des employés et ne peut pas être supprimé" : 
-                          "Options supplémentaires"}>
-                          <span>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, department)}
+                            color={department.employeeCount > 0 ? "default" : "primary"}
+                            disabled={department.employeeCount > 0}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography>
+                    {searchTerm 
+                      ? 'Aucun département trouvé correspondant à votre recherche.' 
+                      : 'Aucun département trouvé.'}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            // Tablet/Desktop view with table
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Nom</TableCell>
+                    {!isTablet && <TableCell>Description</TableCell>}
+                    <TableCell>Employés</TableCell>
+                    <TableCell>Statut</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredDepartments.length > 0 ? (
+                    filteredDepartments.map((department) => (
+                      <TableRow key={department._id}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Avatar sx={{ bgcolor: 'primary.light', mr: 2, width: 30, height: 30 }}>
+                              <BusinessIcon fontSize="small" />
+                            </Avatar>
+                            <Link to={`/departments/${department._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                              <Typography variant="body1" fontWeight="medium">
+                                {department.name}
+                              </Typography>
+                              {isTablet && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {department.description}
+                                </Typography>
+                              )}
+                            </Link>
+                          </Box>
+                        </TableCell>
+                        {!isTablet && <TableCell>{department.description}</TableCell>}
+                        <TableCell>
+                          <Chip
+                            icon={<GroupIcon />}
+                            label={department.employeeCount || 0}
+                            size="small"
+                            color={department.employeeCount > 0 ? "primary" : "default"}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={department.active ? 'Actif' : 'Inactif'}
+                            color={department.active ? 'success' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Voir">
                             <IconButton
+                              component={Link}
+                              to={`/departments/${department._id}`}
+                              color="primary"
                               size="small"
-                              onClick={(e) => handleMenuOpen(e, department)}
-                              color={department.employeeCount > 0 ? "default" : "primary"}
                             >
-                              <MoreVertIcon />
+                              <VisibilityIcon />
                             </IconButton>
-                          </span>
-                        </Tooltip>
+                          </Tooltip>
+                          <Tooltip title="Modifier">
+                            <IconButton
+                              component={Link}
+                              to={`/departments/edit/${department._id}`}
+                              color="primary"
+                              size="small"
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={department.employeeCount > 0 ? 
+                            "Ce département contient des employés et ne peut pas être supprimé" : 
+                            "Options supplémentaires"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleMenuOpen(e, department)}
+                                color={department.employeeCount > 0 ? "default" : "primary"}
+                              >
+                                <MoreVertIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={isTablet ? 4 : 5} align="center">
+                        {searchTerm 
+                          ? 'Aucun département trouvé correspondant à votre recherche.' 
+                          : 'Aucun département trouvé.'}
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      {searchTerm 
-                        ? 'Aucun département trouvé correspondant à votre recherche.' 
-                        : 'Aucun département trouvé.'}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )
         )}
       </Paper>
 

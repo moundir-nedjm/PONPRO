@@ -2,35 +2,15 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, getDate } from 'date-fns';
 import { useSocket } from './SocketContext';
+import apiClient from '../utils/api';
 
 const AttendanceContext = createContext();
 
 export const useAttendance = () => useContext(AttendanceContext);
 
-// Mock departments data
-const mockDepartments = [
-  { _id: 'dept1', name: 'Administration', location: 'Siège' },
-  { _id: 'dept2', name: 'Ressources Humaines', location: 'Siège' },
-  { _id: 'dept3', name: 'Finance', location: 'Siège' },
-  { _id: 'dept4', name: 'Production', location: 'Usine' },
-  { _id: 'dept5', name: 'Logistique', location: 'Entrepôt' },
-  { _id: 'dept6', name: 'Commercial', location: 'Siège' },
-  { _id: 'dept7', name: 'Informatique', location: 'Siège' }
-];
-
-// Mock employees data
-const mockEmployees = [
-  { _id: 'emp1', firstName: 'Mohammed', lastName: 'Benali', position: 'Directeur', department: 'dept1' },
-  { _id: 'emp2', firstName: 'Fatima', lastName: 'Zahra', position: 'RH Manager', department: 'dept2' },
-  { _id: 'emp3', firstName: 'Ahmed', lastName: 'Kader', position: 'Comptable', department: 'dept3' },
-  { _id: 'emp4', firstName: 'Karim', lastName: 'Benzema', position: 'Chef d\'équipe', department: 'dept4' },
-  { _id: 'emp5', firstName: 'Leila', lastName: 'Hadj', position: 'Logisticien', department: 'dept5' },
-  { _id: 'emp6', firstName: 'Youcef', lastName: 'Benatia', position: 'Commercial', department: 'dept6' },
-  { _id: 'emp7', firstName: 'Amina', lastName: 'Belkacem', position: 'Développeur', department: 'dept7' },
-  { _id: 'emp8', firstName: 'Omar', lastName: 'Cherif', position: 'Technicien', department: 'dept4' },
-  { _id: 'emp9', firstName: 'Samira', lastName: 'Saidi', position: 'Assistante', department: 'dept1' },
-  { _id: 'emp10', firstName: 'Rachid', lastName: 'Mehdaoui', position: 'Chauffeur', department: 'dept5' }
-];
+// Environment variable for API URLs and mock data flag
+const API_URL = ''; // We'll use apiClient instead which has port discovery
+const USE_MOCK_DATA = process.env.USE_MOCK_DATA === 'true';
 
 export const AttendanceProvider = ({ children }) => {
   // Shared state
@@ -96,8 +76,25 @@ export const AttendanceProvider = ({ children }) => {
 
   const fetchDepartments = async () => {
     try {
-      // Use mock data instead of API call
-      setDepartments(mockDepartments);
+      if (USE_MOCK_DATA) {
+        // Fake API call delay for UI
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Use the departments from our real data
+        const fakeDepartments = [
+          { _id: '1', name: 'DEG', location: 'Siège' },
+          { _id: '2', name: 'KBK FROID', location: 'Usine' },
+          { _id: '3', name: 'HAMRA', location: 'Entrepôt' },
+          { _id: '4', name: 'HML', location: 'Siège' }
+        ];
+        
+        setDepartments(fakeDepartments);
+      } else {
+        // Actual API call
+        const response = await apiClient.get('/api/departments');
+        setDepartments(response.data);
+      }
+      
       setError(null);
     } catch (err) {
       console.error('Erreur lors du chargement des départements:', err);
@@ -109,14 +106,39 @@ export const AttendanceProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // Use mock data instead of API call
-      let filteredEmployees = [...mockEmployees];
-      
-      if (selectedDepartment !== 'all') {
-        filteredEmployees = mockEmployees.filter(emp => emp.department === selectedDepartment);
+      if (USE_MOCK_DATA) {
+        // Fake API call delay
+        await new Promise(resolve => setTimeout(resolve, 700));
+        
+        // Use the employees from our real data file
+        let filteredEmployees = [
+          { _id: '1', firstName: 'Mohammed', lastName: 'Benali', position: 'Technicien', department: '1' },
+          { _id: '2', firstName: 'Fatima', lastName: 'Zahra', position: 'Ingénieur', department: '2' },
+          { _id: '3', firstName: 'Ahmed', lastName: 'Kader', position: 'Technicien', department: '3' },
+          { _id: '4', firstName: 'Karim', lastName: 'Benzema', position: "Chef d'équipe", department: '2' },
+          { _id: '5', firstName: 'Leila', lastName: 'Hadj', position: 'Ingénieur', department: '4' },
+          { _id: '6', firstName: 'Youcef', lastName: 'Benatia', position: 'Technicien', department: '3' },
+          { _id: '7', firstName: 'Amina', lastName: 'Belkacem', position: 'Assistante', department: '1' },
+          { _id: '8', firstName: 'Omar', lastName: 'Cherif', position: 'Technicien', department: '2' },
+          { _id: '9', firstName: 'Samira', lastName: 'Saidi', position: 'Ingénieur', department: '3' },
+          { _id: '10', firstName: 'Rachid', lastName: 'Mehdaoui', position: "Chef d'équipe", department: '4' }
+        ];
+        
+        if (selectedDepartment !== 'all') {
+          filteredEmployees = filteredEmployees.filter(emp => emp.department === selectedDepartment);
+        }
+        
+        setEmployees(filteredEmployees);
+      } else {
+        // Actual API call
+        const url = selectedDepartment === 'all' 
+          ? '/api/employees' 
+          : `/api/employees?department=${selectedDepartment}`;
+          
+        const response = await apiClient.get(url);
+        setEmployees(response.data);
       }
       
-      setEmployees(filteredEmployees);
       setError(null);
     } catch (err) {
       console.error('Erreur lors du chargement des employés:', err);
@@ -130,83 +152,143 @@ export const AttendanceProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // Formater les dates pour l'API
+      // Format dates for API
       const startDate = format(startOfMonth(month), 'yyyy-MM-dd');
       const endDate = format(endOfMonth(month), 'yyyy-MM-dd');
+      const yearMonth = format(month, 'yyyy-MM');
       
-      // Generate mock attendance data instead of API call
-      const attendanceByEmployee = {};
-      
-      employees.forEach(employee => {
-        attendanceByEmployee[employee._id] = {};
+      if (USE_MOCK_DATA) {
+        // Fake API call delay
+        await new Promise(resolve => setTimeout(resolve, 800));
         
-        daysInMonth.forEach(day => {
-          const dayNum = getDate(day);
-          if (isWeekend(day)) {
-            attendanceByEmployee[employee._id][dayNum] = 'W';
-          } else {
-            // Randomly assign codes with weighted probabilities
-            const random = Math.random();
-            if (random < 0.7) {
-              // 70% chance of being present
-              attendanceByEmployee[employee._id][dayNum] = 'P';
-            } else if (random < 0.75) {
-              // 5% chance of being present with prime
-              attendanceByEmployee[employee._id][dayNum] = 'PP';
-            } else if (random < 0.78) {
-              // 3% chance of double day
-              attendanceByEmployee[employee._id][dayNum] = '2P';
-            } else if (random < 0.8) {
-              // 2% chance of present with overtime
-              attendanceByEmployee[employee._id][dayNum] = 'PH';
-            } else if (random < 0.82) {
-              // 2% chance of half day
-              attendanceByEmployee[employee._id][dayNum] = 'P/2';
-            } else if (random < 0.85) {
-              // 3% chance of mission
-              attendanceByEmployee[employee._id][dayNum] = 'MS';
-            } else if (random < 0.88) {
-              // 3% chance of annual leave
-              attendanceByEmployee[employee._id][dayNum] = 'CA';
-            } else if (random < 0.9) {
-              // 2% chance of sick leave
-              attendanceByEmployee[employee._id][dayNum] = 'CM';
-            } else if (random < 0.92) {
-              // 2% chance of justified absence
-              attendanceByEmployee[employee._id][dayNum] = 'AJ';
-            } else if (random < 0.94) {
-              // 2% chance of unjustified absence
-              attendanceByEmployee[employee._id][dayNum] = 'AN';
-            } else if (random < 0.95) {
-              // 1% chance of paid recovery leave
-              attendanceByEmployee[employee._id][dayNum] = 'CRP';
-            } else if (random < 0.96) {
-              // 1% chance of unpaid leave
-              attendanceByEmployee[employee._id][dayNum] = 'CSS';
-            } else if (random < 0.97) {
-              // 1% chance of position change
-              attendanceByEmployee[employee._id][dayNum] = 'HP';
-            } else if (random < 0.98) {
-              // 1% chance of authorized paid absence
-              attendanceByEmployee[employee._id][dayNum] = 'AOP';
-            } else if (random < 0.99) {
-              // 1% chance of authorized unpaid absence
-              attendanceByEmployee[employee._id][dayNum] = 'AON';
+        // Create attendance data based on our real attendance data file
+        const attendanceByEmployee = {};
+        
+        // Sample real attendance records
+        const realAttendanceRecords = [
+          { employeeId: '1', date: '2023-04-07', status: 'present', checkInTime: '08:00', checkOutTime: null },
+          { employeeId: '4', date: '2023-04-07', status: 'present', checkInTime: '08:00', checkOutTime: '17:00' },
+          { employeeId: '7', date: '2023-04-07', status: 'present', checkInTime: '08:00', checkOutTime: '17:00' },
+          { employeeId: '9', date: '2023-04-07', status: 'present', checkInTime: '08:00', checkOutTime: '17:00' },
+          { employeeId: '3', date: '2023-04-07', status: 'absent', checkInTime: null, checkOutTime: null },
+          { employeeId: '5', date: '2023-04-07', status: 'late', checkInTime: '08:30', checkOutTime: null },
+          { employeeId: '6', date: '2023-04-07', status: 'late', checkInTime: '08:45', checkOutTime: null },
+          { employeeId: '8', date: '2023-04-07', status: 'absent', checkInTime: null, checkOutTime: null }
+        ];
+        
+        // Initialize data structure
+        employees.forEach(employee => {
+          attendanceByEmployee[employee._id] = {};
+          
+          daysInMonth.forEach(day => {
+            const dayNum = getDate(day);
+            const dayString = format(day, 'yyyy-MM-dd');
+            
+            // Check if we have real data for this employee on this day
+            const matchingRecord = realAttendanceRecords.find(record => 
+              record.employeeId === employee._id && record.date === dayString
+            );
+            
+            if (matchingRecord) {
+              // Use real data code
+              switch(matchingRecord.status) {
+                case 'present': 
+                  attendanceByEmployee[employee._id][dayNum] = matchingRecord.checkOutTime ? 'P' : 'P';
+                  break;
+                case 'absent': 
+                  attendanceByEmployee[employee._id][dayNum] = 'AN';
+                  break;
+                case 'late': 
+                  attendanceByEmployee[employee._id][dayNum] = 'P';
+                  break;
+                default:
+                  attendanceByEmployee[employee._id][dayNum] = 'P';
+              }
+            } else if (isWeekend(day)) {
+              // Weekend code
+              attendanceByEmployee[employee._id][dayNum] = 'W';
             } else {
-              // 1% chance of other codes
-              const otherCodes = ['JT', 'PR', 'PN', 'PC', 'JF', 'CH', 'DC', 'G.L', 'JD', 'D'];
-              const randomCode = otherCodes[Math.floor(Math.random() * otherCodes.length)];
-              attendanceByEmployee[employee._id][dayNum] = randomCode;
+              // Generate sensible mock data for other days
+              const random = Math.random();
+              if (random < 0.8) {
+                // 80% chance of being present
+                attendanceByEmployee[employee._id][dayNum] = 'P';
+              } else if (random < 0.9) {
+                // 10% chance of leave
+                attendanceByEmployee[employee._id][dayNum] = 'CA';
+              } else {
+                // 10% chance of absence
+                attendanceByEmployee[employee._id][dayNum] = 'AN';
+              }
             }
-          }
+          });
         });
-      });
+        
+        setAttendanceData(attendanceByEmployee);
+      } else {
+        // Actual API call - corrected to use the monthly-sheet endpoint
+        const deptParam = selectedDepartment === 'all' ? '' : `?department=${selectedDepartment}`;
+        const apiUrl = `/api/attendance/monthly-sheet/${yearMonth}${deptParam}`;
+        console.log('Fetching attendance data from:', apiUrl);
+        
+        try {
+          const response = await apiClient.get(apiUrl);
+          console.log('API Response received:', response.status, response.statusText);
+          
+          if (response.data && response.data.success) {
+            console.log('API data success. Got employees:', response.data.data.employees?.length || 0);
+            console.log('API data days:', response.data.data.days?.length || 0);
+            
+            const { employees: employeeData, days } = response.data.data;
+            const attendanceByEmployee = {};
+            
+            // Process API data into the format we need
+            if (Array.isArray(employeeData) && employeeData.length > 0) {
+              employeeData.forEach(employee => {
+                attendanceByEmployee[employee._id] = {};
+                
+                if (Array.isArray(days) && days.length > 0) {
+                  days.forEach(day => {
+                    if (day && typeof day === 'object' && day.day) {
+                      const dayNum = day.day;
+                      // Check if employee has attendance data for this day
+                      if (employee.attendance && Array.isArray(employee.attendance) && 
+                          employee.attendance.length >= day.day && employee.attendance[day.day - 1]) {
+                        const status = employee.attendance[day.day - 1]?.status || '';
+                        attendanceByEmployee[employee._id][dayNum] = status;
+                      } else {
+                        console.warn(`No attendance data for employee ${employee._id} on day ${dayNum}`);
+                        attendanceByEmployee[employee._id][dayNum] = '';
+                      }
+                    } else {
+                      console.warn('Invalid day object:', day);
+                    }
+                  });
+                } else {
+                  console.warn('No days data or empty days array');
+                }
+              });
+              
+              setAttendanceData(attendanceByEmployee);
+              console.log('Attendance data processed successfully');
+            } else {
+              console.warn('No employee data or empty employee array');
+              setAttendanceData({});
+            }
+          } else {
+            console.error('API response not successful:', response.data);
+            throw new Error('Failed to load monthly attendance data');
+          }
+        } catch (apiError) {
+          console.error('API call error:', apiError);
+          throw apiError;
+        }
+      }
       
-      setAttendanceData(attendanceByEmployee);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
-      console.error('Erreur lors du chargement des données de présence:', err);
+      console.error('Error in fetchAttendanceData:', err);
       setError('Impossible de charger les données de présence. Veuillez réessayer plus tard.');
     } finally {
       setLoading(false);
@@ -215,15 +297,37 @@ export const AttendanceProvider = ({ children }) => {
 
   const updateAttendanceCode = async (employeeId, day, code) => {
     try {
-      // Update local data directly without API call
-      const updatedData = { ...attendanceData };
-      if (!updatedData[employeeId]) {
-        updatedData[employeeId] = {};
+      if (USE_MOCK_DATA) {
+        // Update local data directly without API call
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const updatedData = { ...attendanceData };
+        if (!updatedData[employeeId]) {
+          updatedData[employeeId] = {};
+        }
+        updatedData[employeeId][day] = code;
+        setAttendanceData(updatedData);
+      } else {
+        // Actual API call
+        const dayDate = new Date(month.getFullYear(), month.getMonth(), day);
+        const formattedDate = format(dayDate, 'yyyy-MM-dd');
+        
+        await apiClient.post(`/api/attendance/code`, {
+          employeeId,
+          date: formattedDate,
+          code
+        });
+        
+        // Update local state after successful API call
+        const updatedData = { ...attendanceData };
+        if (!updatedData[employeeId]) {
+          updatedData[employeeId] = {};
+        }
+        updatedData[employeeId][day] = code;
+        setAttendanceData(updatedData);
       }
-      updatedData[employeeId][day] = code;
-      setAttendanceData(updatedData);
-      setLastUpdated(new Date());
       
+      setLastUpdated(new Date());
       return true;
     } catch (err) {
       console.error('Erreur lors de la mise à jour du code de présence:', err);
@@ -245,62 +349,77 @@ export const AttendanceProvider = ({ children }) => {
   };
 
   const getAttendanceCode = (employeeId, day) => {
-    // Obtenir le numéro du jour
+    // Get the day number
     const dayNum = getDate(day);
     
-    // Vérifier si nous avons des données de présence pour cet employé et ce jour
-    if (attendanceData[employeeId] && attendanceData[employeeId][dayNum]) {
+    // Check if we have data for this employee and day
+    if (
+      attendanceData && 
+      attendanceData[employeeId] && 
+      attendanceData[employeeId][dayNum]
+    ) {
       return attendanceData[employeeId][dayNum];
     }
     
-    // Par défaut, weekend pour les samedis et dimanches
-    if (isWeekend(day)) {
-      return 'W';
-    }
-    
-    // Par défaut vide (pas de données)
+    // Return empty string if no data found
     return '';
   };
 
-  // Filtrer les employés en fonction du terme de recherche
-  const filteredEmployees = employees.filter(
-    (employee) =>
-      employee.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.position?.toLowerCase().includes(searchTerm.toLowerCase())
+  const getDepartmentName = (departmentId) => {
+    const department = departments.find(d => d._id === departmentId);
+    return department ? department.name : 'N/A';
+  };
+
+  // Calculate filtered employees based on search term
+  const getFilteredEmployees = () => {
+    if (!searchTerm) {
+      return employees;
+    }
+    
+    return employees.filter(employee => {
+      const fullName = `${employee.firstName} ${employee.lastName}`.toLowerCase();
+      const position = (employee.position || '').toLowerCase();
+      const id = employee._id?.toString().toLowerCase() || '';
+      const employeeId = employee.employeeId?.toString().toLowerCase() || '';
+      const searchLower = searchTerm.toLowerCase();
+      
+      return fullName.includes(searchLower) || 
+             position.includes(searchLower) || 
+             id.includes(searchLower) ||
+             employeeId.includes(searchLower);
+    });
+  };
+  
+  // Get filtered employees
+  const filteredEmployees = getFilteredEmployees();
+
+  // Provide methods and state to consumers
+  return (
+    <AttendanceContext.Provider
+      value={{
+        attendanceData,
+        employees,
+        filteredEmployees,
+        departments,
+        selectedDepartment,
+        month,
+        daysInMonth,
+        loading,
+        error,
+        searchTerm,
+        lastUpdated,
+        handleSearchChange,
+        handleDepartmentChange,
+        handleMonthChange,
+        getAttendanceCode,
+        updateAttendanceCode,
+        getDepartmentName,
+        fetchAttendanceData
+      }}
+    >
+      {children}
+    </AttendanceContext.Provider>
   );
-
-  // Obtenir le nom du département sélectionné
-  const getDepartmentName = () => {
-    if (selectedDepartment === 'all') return 'Tous les départements';
-    const dept = departments.find(d => d._id === selectedDepartment);
-    return dept ? dept.name : '';
-  };
-
-  const value = {
-    attendanceData,
-    employees,
-    filteredEmployees,
-    departments,
-    selectedDepartment,
-    month,
-    daysInMonth,
-    loading,
-    error,
-    searchTerm,
-    lastUpdated,
-    fetchDepartments,
-    fetchEmployees,
-    fetchAttendanceData,
-    updateAttendanceCode,
-    handleSearchChange,
-    handleDepartmentChange,
-    handleMonthChange,
-    getAttendanceCode,
-    getDepartmentName
-  };
-
-  return <AttendanceContext.Provider value={value}>{children}</AttendanceContext.Provider>;
 };
 
 export default AttendanceContext; 

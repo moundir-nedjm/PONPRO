@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -73,7 +74,7 @@ const PerformanceReport = () => {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await axios.get('/api/departments');
+        const res = await apiClient.get('/departments');
         setDepartments(res.data.data || []);
       } catch (err) {
         console.error('Error fetching departments:', err);
@@ -91,18 +92,21 @@ const PerformanceReport = () => {
     try {
       setLoading(true);
       
-      // Format dates for API
-      const startDate = format(filters.startDate, 'yyyy-MM-dd');
-      const endDate = format(filters.endDate, 'yyyy-MM-dd');
-      
-      // Build query params
-      let url = `/api/reports/performance?startDate=${startDate}&endDate=${endDate}`;
-      if (filters.department !== 'all') {
-        url += `&department=${filters.department}`;
+      // Create URL parameters
+      const params = new URLSearchParams();
+      if (filters.startDate) {
+        params.append('startDate', filters.startDate.toISOString());
+      }
+      if (filters.endDate) {
+        params.append('endDate', filters.endDate.toISOString());
+      }
+      if (filters.department && filters.department !== 'all') {
+        params.append('department', filters.department);
       }
       
-      console.log('Fetching performance report from:', url);
-      const res = await axios.get(url, { timeout: 5000 }); // Add timeout to prevent long waiting
+      const url = `/reports/performance?${params.toString()}`;
+      const res = await apiClient.get(url);
+      
       console.log('Performance report data:', res.data);
       
       if (res.data && res.data.success && res.data.data) {
@@ -115,124 +119,15 @@ const PerformanceReport = () => {
       }
     } catch (err) {
       console.error('Error fetching performance data:', err);
+      setError('Erreur lors du chargement des données. Veuillez réessayer plus tard.');
       
-      // Generate and use mock data when API fails
-      console.log('Using mock performance data instead');
-      const mockData = generateMockPerformanceData();
-      setPerformanceData(mockData.employeePerformance);
-      setTopPerformers(mockData.topPerformers);
-      setDepartmentPerformance(mockData.departmentPerformance);
-      
-      // Don't set an error message
-      setError(null);
+      // Reset data on error
+      setPerformanceData([]);
+      setTopPerformers([]);
+      setDepartmentPerformance([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Generate mock data for demo purposes when server is not available
-  const generateMockPerformanceData = () => {
-    // Create mock employee performance data
-    const mockEmployeePerformance = Array.from({ length: 20 }, (_, i) => ({
-      id: `emp${i}`,
-      employeeId: `EMP${i + 100}`,
-      name: `Prénom${i} Nom${i}`,
-      department: getDepartmentName(i),
-      position: `Position ${(i % 5) + 1}`,
-      attendanceRate: (100 * (0.75 + Math.random() * 0.25)).toFixed(1),
-      punctualityRate: (100 * (0.80 + Math.random() * 0.20)).toFixed(1),
-      projectsCompleted: Math.floor(Math.random() * 10) + 1,
-      tasksCompleted: Math.floor(Math.random() * 50) + 10,
-      overallRating: Math.floor(Math.random() * 3) + 3,
-      performanceScore: (100 * (0.65 + Math.random() * 0.35)).toFixed(1)
-    }));
-
-    // Helper function to get department name
-    function getDepartmentName(index) {
-      const departments = [
-        'KBK FROID', 'KBK ELEC', 'HML', 'REB', 
-        'DEG', 'HAMRA', 'ADM SETIF', 'ADM HMD'
-      ];
-      return departments[index % departments.length];
-    }
-
-    // Create mock top performers data - the top 5 employees
-    const mockTopPerformers = Array.from({ length: 5 }, (_, i) => ({
-      _id: `top${i}`,
-      firstName: `Prénom${i}`,
-      lastName: `Nom${i}`,
-      department: getDepartmentName(i),
-      position: `Position ${(i % 5) + 1}`,
-      attendanceRate: (95 + Math.random() * 5).toFixed(1),
-      punctualityRate: (95 + Math.random() * 5).toFixed(1),
-      performanceScore: (90 + Math.random() * 10).toFixed(1),
-      averageRating: (4 + Math.random()).toFixed(1)
-    }));
-
-    // Create mock department performance data
-    const mockDepartmentPerformance = [
-      {
-        id: 'dept1',
-        name: 'KBK FROID',
-        employeeCount: 8,
-        attendanceRate: (100 * (0.75 + Math.random() * 0.25)).toFixed(1),
-        punctualityRate: (100 * (0.80 + Math.random() * 0.20)).toFixed(1),
-        projectsCompleted: Math.floor(Math.random() * 30) + 10,
-        tasksCompleted: Math.floor(Math.random() * 150) + 50,
-        averageRating: (Math.random() * 2 + 3).toFixed(1),
-        performanceScore: (100 * (0.65 + Math.random() * 0.35)).toFixed(1)
-      },
-      {
-        id: 'dept2',
-        name: 'KBK ELEC',
-        employeeCount: 10,
-        attendanceRate: (100 * (0.75 + Math.random() * 0.25)).toFixed(1),
-        punctualityRate: (100 * (0.80 + Math.random() * 0.20)).toFixed(1),
-        projectsCompleted: Math.floor(Math.random() * 30) + 10,
-        tasksCompleted: Math.floor(Math.random() * 150) + 50,
-        averageRating: (Math.random() * 2 + 3).toFixed(1),
-        performanceScore: (100 * (0.65 + Math.random() * 0.35)).toFixed(1)
-      },
-      {
-        id: 'dept3',
-        name: 'HML',
-        employeeCount: 12,
-        attendanceRate: (100 * (0.75 + Math.random() * 0.25)).toFixed(1),
-        punctualityRate: (100 * (0.80 + Math.random() * 0.20)).toFixed(1),
-        projectsCompleted: Math.floor(Math.random() * 30) + 10,
-        tasksCompleted: Math.floor(Math.random() * 150) + 50,
-        averageRating: (Math.random() * 2 + 3).toFixed(1),
-        performanceScore: (100 * (0.65 + Math.random() * 0.35)).toFixed(1)
-      },
-      {
-        id: 'dept4',
-        name: 'REB',
-        employeeCount: 7,
-        attendanceRate: (100 * (0.75 + Math.random() * 0.25)).toFixed(1),
-        punctualityRate: (100 * (0.80 + Math.random() * 0.20)).toFixed(1),
-        projectsCompleted: Math.floor(Math.random() * 30) + 10,
-        tasksCompleted: Math.floor(Math.random() * 150) + 50,
-        averageRating: (Math.random() * 2 + 3).toFixed(1),
-        performanceScore: (100 * (0.65 + Math.random() * 0.35)).toFixed(1)
-      },
-      {
-        id: 'dept5',
-        name: 'DEG',
-        employeeCount: 9,
-        attendanceRate: (100 * (0.75 + Math.random() * 0.25)).toFixed(1),
-        punctualityRate: (100 * (0.80 + Math.random() * 0.20)).toFixed(1),
-        projectsCompleted: Math.floor(Math.random() * 30) + 10,
-        tasksCompleted: Math.floor(Math.random() * 150) + 50,
-        averageRating: (Math.random() * 2 + 3).toFixed(1),
-        performanceScore: (100 * (0.65 + Math.random() * 0.35)).toFixed(1)
-      }
-    ];
-
-    return {
-      employeePerformance: mockEmployeePerformance,
-      topPerformers: mockTopPerformers,
-      departmentPerformance: mockDepartmentPerformance
-    };
   };
 
   const handleFilterChange = (field, value) => {

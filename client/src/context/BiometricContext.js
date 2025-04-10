@@ -98,11 +98,23 @@ export const BiometricProvider = ({ children }) => {
           const updated = { ...emp };
           
           if (!updated.biometricStatus) {
-            updated.biometricStatus = {};
+            updated.biometricStatus = {
+              faceRecognition: {
+                status: 'not_started',
+                samplesCount: 0
+              },
+              fingerprint: {
+                status: 'not_started',
+                samplesCount: 0
+              }
+            };
           }
           
           if (!updated.biometricStatus[type]) {
-            updated.biometricStatus[type] = {};
+            updated.biometricStatus[type] = {
+              status: 'not_started',
+              samplesCount: 0
+            };
           }
           
           if (status) {
@@ -170,7 +182,41 @@ export const BiometricProvider = ({ children }) => {
       const response = await BiometricService.getTeamMembers();
       
       if (response && response.success) {
-        setTeamMembers(response.data || []);
+        // Filter only active employees and ensure they have proper biometric status fields
+        const formattedTeamMembers = (response.data || []).map(employee => {
+          // Ensure each employee has properly formatted biometric status
+          if (!employee.biometricStatus) {
+            employee.biometricStatus = {
+              faceRecognition: {
+                status: 'not_started',
+                samplesCount: 0
+              },
+              fingerprint: {
+                status: 'not_started',
+                samplesCount: 0
+              }
+            };
+          }
+          
+          // Ensure both biometric types exist
+          if (!employee.biometricStatus.faceRecognition) {
+            employee.biometricStatus.faceRecognition = {
+              status: 'not_started',
+              samplesCount: 0
+            };
+          }
+          
+          if (!employee.biometricStatus.fingerprint) {
+            employee.biometricStatus.fingerprint = {
+              status: 'not_started',
+              samplesCount: 0
+            };
+          }
+          
+          return employee;
+        });
+        
+        setTeamMembers(formattedTeamMembers);
         setError(null);
       } else {
         throw new Error('Failed to fetch team members');
@@ -179,12 +225,9 @@ export const BiometricProvider = ({ children }) => {
       console.error('Error fetching team members:', err);
       setError('Erreur lors du chargement des membres de l\'équipe');
       
-      // Fall back to mock data if API fails
-      const mockTeamMembers = [
-        // ... include mock data here in case API fails ...
-      ];
-      
-      setTeamMembers(mockTeamMembers);
+      // If we need to handle edge cases, log the error but don't crash the app
+      // Keep the existing team members array rather than setting it to empty
+      console.warn('Using existing team data due to fetch error');
     } finally {
       setLoading(false);
     }

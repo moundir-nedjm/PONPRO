@@ -38,7 +38,7 @@ import {
 } from '@mui/icons-material';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import axios from 'axios';
+import apiClient from '../../utils/api';
 
 // Import your individual report components
 import AttendanceReport from './AttendanceReport';
@@ -71,7 +71,7 @@ const ReportGenerator = () => {
   React.useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await axios.get('/api/departments');
+        const res = await apiClient.get('/departments');
         setDepartments(res.data.data || []);
       } catch (err) {
         console.error('Error fetching departments:', err);

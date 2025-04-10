@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import apiClient from '../../utils/api';
 import {
   Box,
   Typography,
@@ -74,11 +75,11 @@ const AttendanceDashboard = () => {
 
   const fetchAttendanceCodes = async () => {
     try {
-      const response = await axios.get('/api/attendance-codes');
-      setAttendanceCodes(response.data.data);
+      const response = await apiClient.get('/attendance-codes');
+      setAttendanceCodes(response.data.data || []);
     } catch (err) {
       setError('Erreur lors du chargement des codes de présence');
-      console.error(err);
+      console.error('Error fetching attendance codes:', err);
     }
   };
 

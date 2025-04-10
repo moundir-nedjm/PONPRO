@@ -21,10 +21,13 @@ exports.login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
     
-    if (!identifier || !password) {
+    console.log(`Login attempt: ${identifier}`);
+    
+    if (!identifier) {
+      console.log('Login rejected: No identifier provided');
       return res.status(400).json({
         success: false,
-        message: 'Email/ID and password are required'
+        message: 'Email/ID is required'
       });
     }
     
@@ -37,6 +40,7 @@ exports.login = async (req, res) => {
     });
     
     if (!employee) {
+      console.log(`Login failed: User not found with identifier ${identifier}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -44,7 +48,9 @@ exports.login = async (req, res) => {
     }
     
     // For demo purposes, we're accepting any password
+    // Comment out password check for now
     // In a real app, use proper password hashing and verification
+    console.log(`Login successful for ${employee.email} (${employee.firstName} ${employee.lastName}) with role: ${employee.role}`);
     
     // Generate session token
     const token = generateToken(employee._id);

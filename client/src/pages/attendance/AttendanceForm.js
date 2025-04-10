@@ -46,12 +46,6 @@ const AttendanceForm = () => {
       try {
         setLoading(true);
         
-        // In a real application, you would fetch this data from your API
-        // For now, we'll use mock data
-        
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
         // Get current location
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
@@ -67,41 +61,49 @@ const AttendanceForm = () => {
           );
         }
         
-        // Mock employees data
-        const mockEmployees = [
-          { id: '1', firstName: 'Ahmed', lastName: 'Benali', employeeId: 'EMP001' },
-          { id: '2', firstName: 'Fatima', lastName: 'Zahra', employeeId: 'EMP002' },
-          { id: '3', firstName: 'Mohammed', lastName: 'Kaci', employeeId: 'EMP003' },
-          { id: '4', firstName: 'Amina', lastName: 'Hadj', employeeId: 'EMP004' },
-          { id: '5', firstName: 'Karim', lastName: 'Boudiaf', employeeId: 'EMP005' }
-        ];
+        // Fetch employees
+        await fetchEmployees();
         
-        // Mock today's attendance data
-        const mockTodayAttendance = {
-          '1': { id: 'att1', checkIn: '08:45', checkOut: null },
-          '3': { id: 'att3', checkIn: '08:30', checkOut: '17:15' }
-        };
-        
-        setEmployees(mockEmployees);
-        setTodayAttendance(mockTodayAttendance);
-        
-        // If the current user is not an admin or manager, pre-select their employee ID
-        if (currentUser.role === 'user' && currentUser.employeeId) {
-          const userEmployee = mockEmployees.find(emp => emp.id === currentUser.employeeId);
-          if (userEmployee) {
-            setSelectedEmployee(userEmployee.id);
+        // Fetch today's attendance data
+        try {
+          const res = await axios.get('/api/attendance/today');
+          
+          if (res.data && res.data.success) {
+            const records = res.data.data.records || [];
             
-            // Check if the user has already checked in today
-            if (mockTodayAttendance[userEmployee.id]) {
-              if (mockTodayAttendance[userEmployee.id].checkOut) {
-                // Already checked out
-                setError('Vous avez déjà pointé votre entrée et sortie aujourd\'hui');
-              } else {
-                // Checked in but not out
-                setIsCheckingOut(true);
+            // Convert to map for easier lookup
+            const attendanceMap = {};
+            records.forEach(record => {
+              if (record.employee && record.employee._id) {
+                attendanceMap[record.employee._id] = {
+                  id: record._id,
+                  checkIn: record.checkIn ? new Date(record.checkIn.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null,
+                  checkOut: record.checkOut ? new Date(record.checkOut.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null
+                };
+              }
+            });
+            
+            setTodayAttendance(attendanceMap);
+            
+            // If the current user is not an admin or manager, pre-select their employee ID
+            if (currentUser.role === 'user' && currentUser.employeeId) {
+              if (attendanceMap[currentUser.employeeId]) {
+                setSelectedEmployee(currentUser.employeeId);
+                
+                // Check if the user has already checked in today
+                if (attendanceMap[currentUser.employeeId].checkOut) {
+                  // Already checked out
+                  setError('Vous avez déjà pointé votre entrée et sortie aujourd\'hui');
+                } else {
+                  // Checked in but not out
+                  setIsCheckingOut(true);
+                }
               }
             }
           }
+        } catch (err) {
+          console.error('Error fetching today\'s attendance:', err);
+          setTodayAttendance({});
         }
         
         setLoading(false);
@@ -114,6 +116,36 @@ const AttendanceForm = () => {
 
     fetchData();
   }, [currentUser]);
+
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('/api/employees/active');
+      
+      if (res.data && res.data.success && Array.isArray(res.data.data)) {
+        setEmployees(res.data.data);
+      } else if (Array.isArray(res.data)) {
+        setEmployees(res.data);
+      } else {
+        setEmployees([]);
+      }
+      
+      // Try to find employee matching current user
+      if (currentUser && currentUser.employeeId) {
+        const userEmployee = res.data.data.find(emp => 
+          emp._id === currentUser.employeeId || emp.id === currentUser.employeeId
+        );
+        if (userEmployee) {
+          setSelectedEmployee(userEmployee);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+      setEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEmployeeChange = (event) => {
     const employeeId = event.target.value;

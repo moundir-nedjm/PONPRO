@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Set the base URL for all API requests
-axios.defaults.baseURL = 'http://localhost:5000/api';
+axios.defaults.baseURL = 'http://localhost:5002/api';
 
 /**
  * Service for handling biometric operations
@@ -159,22 +159,23 @@ const BiometricService = {
 
   /**
    * Capture face biometric data
-   * This would normally connect to a camera API
    * @returns {Promise} - Face capture result
    */
   captureFace: async () => {
     try {
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call the actual API endpoint for face capture
+      const response = await axios.post('/api/biometrics/face/capture');
       
-      // In a real application, this would connect to a webcam API
-      // and capture actual face data
-      return {
-        success: true,
-        image: 'data:image/jpeg;base64,' + btoa(Math.random().toString(36)), // Random mock data
-        quality: Math.floor(Math.random() * 30) + 70, // Random quality between 70-100
-        timestamp: new Date().toISOString()
-      };
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          image: response.data.image,
+          quality: response.data.quality,
+          timestamp: response.data.timestamp || new Date().toISOString()
+        };
+      } else {
+        throw new Error(response.data?.error || 'Failed to capture face data');
+      }
     } catch (error) {
       console.error('Error capturing face:', error);
       return {
@@ -186,22 +187,23 @@ const BiometricService = {
 
   /**
    * Capture fingerprint biometric data
-   * This would normally connect to a fingerprint scanner
    * @returns {Promise} - Fingerprint capture result
    */
   captureFingerprint: async () => {
     try {
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call the actual API endpoint for fingerprint capture
+      const response = await axios.post('/api/biometrics/fingerprint/capture');
       
-      // In a real application, this would connect to a fingerprint reader API
-      // and capture actual fingerprint data
-      return {
-        success: true,
-        data: btoa(Math.random().toString(36)), // Random mock data
-        quality: Math.floor(Math.random() * 30) + 70, // Random quality between 70-100
-        timestamp: new Date().toISOString()
-      };
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          quality: response.data.quality,
+          timestamp: response.data.timestamp || new Date().toISOString()
+        };
+      } else {
+        throw new Error(response.data?.error || 'Failed to capture fingerprint data');
+      }
     } catch (error) {
       console.error('Error capturing fingerprint:', error);
       return {

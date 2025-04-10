@@ -57,6 +57,7 @@ import { Pie, Bar, Line } from 'react-chartjs-2';
 import { format as formatDate } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import axios from 'axios';
 
 // Enregistrer les composants ChartJS
 ChartJS.register(
@@ -110,126 +111,163 @@ const AttendanceStats = () => {
     fetchData();
   }, [dateRange, selectedDepartment]);
 
+  // Fetch employees from API
+  const fetchEmployees = async () => {
+    try {
+      const res = await axios.get('/api/employees/active');
+      
+      if (res.data && res.data.success && Array.isArray(res.data.data)) {
+        setEmployees(res.data.data);
+      } else if (Array.isArray(res.data)) {
+        setEmployees(res.data);
+      } else {
+        setEmployees([]);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+      setEmployees([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Dans une application réelle, vous récupéreriez ces données depuis votre API
-      // Pour l'instant, nous utiliserons des données fictives
+      // Fetch real departments from API
+      const deptRes = await axios.get('/api/departments');
+      let realDepartments = [];
       
-      // Simuler un délai d'appel API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Données fictives des départements
-      const mockDepartments = [
-        { id: '1', name: 'KBK FROID' },
-        { id: '2', name: 'KBK ELEC' },
-        { id: '3', name: 'HML' },
-        { id: '4', name: 'REB' },
-        { id: '5', name: 'DEG' },
-        { id: '6', name: 'HAMRA' },
-        { id: '7', name: 'ADM SETIF' },
-        { id: '8', name: 'ADM HMD' }
-      ];
-      
-      // Données fictives des employés
-      const mockEmployees = [
-        { id: '1', firstName: 'Ahmed', lastName: 'Benali', departmentId: '1' },
-        { id: '2', firstName: 'Fatima', lastName: 'Zahra', departmentId: '2' },
-        { id: '3', firstName: 'Mohammed', lastName: 'Kaci', departmentId: '3' },
-        { id: '4', firstName: 'Amina', lastName: 'Hadj', departmentId: '4' },
-        { id: '5', firstName: 'Karim', lastName: 'Boudiaf', departmentId: '5' },
-        { id: '6', firstName: 'Samira', lastName: 'Taleb', departmentId: '6' },
-        { id: '7', firstName: 'Youcef', lastName: 'Belmadi', departmentId: '7' },
-        { id: '8', firstName: 'Nawal', lastName: 'Benkhalfa', departmentId: '8' },
-        { id: '9', firstName: 'Sofiane', lastName: 'Feghouli', departmentId: '1' },
-        { id: '10', firstName: 'Leila', lastName: 'Haddad', departmentId: '2' }
-      ];
-      
-      // Filtrer les employés par département si nécessaire
-      const filteredEmployees = selectedDepartment === 'all' 
-        ? mockEmployees 
-        : mockEmployees.filter(emp => emp.departmentId === selectedDepartment);
-      
-      // Générer des données de présence fictives
-      const mockAttendanceByStatus = {
-        present: Math.floor(Math.random() * 50) + 150,
-        late: Math.floor(Math.random() * 30) + 20,
-        absent: Math.floor(Math.random() * 20) + 10
-      };
-      
-      const mockAttendanceByDepartment = {};
-      mockDepartments.forEach(dept => {
-        mockAttendanceByDepartment[dept.name] = {
-          present: Math.floor(Math.random() * 30) + 20,
-          late: Math.floor(Math.random() * 15) + 5,
-          absent: Math.floor(Math.random() * 10) + 1
-        };
-      });
-      
-      const mockAttendanceByEmployee = {};
-      filteredEmployees.forEach(emp => {
-        mockAttendanceByEmployee[`${emp.firstName} ${emp.lastName}`] = {
-          present: Math.floor(Math.random() * 20) + 10,
-          late: Math.floor(Math.random() * 10) + 1,
-          absent: Math.floor(Math.random() * 5)
-        };
-      });
-      
-      // Générer des données de présence par date
-      const mockAttendanceByDate = {};
-      const currentDate = new Date();
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(currentDate);
-        date.setDate(date.getDate() - i);
-        const dateString = date.toISOString().split('T')[0];
-        mockAttendanceByDate[dateString] = {
-          present: Math.floor(Math.random() * 30) + 20,
-          late: Math.floor(Math.random() * 15) + 5,
-          absent: Math.floor(Math.random() * 10) + 1
-        };
+      if (deptRes.data && deptRes.data.success && Array.isArray(deptRes.data.data)) {
+        realDepartments = deptRes.data.data;
+      } else if (Array.isArray(deptRes.data)) {
+        realDepartments = deptRes.data;
       }
       
-      // Générer le top des employés les plus ponctuels
-      const mockTopEmployees = filteredEmployees
-        .map(emp => ({
-          id: emp.id,
-          name: `${emp.firstName} ${emp.lastName}`,
-          department: mockDepartments.find(d => d.id === emp.departmentId)?.name,
-          presentDays: Math.floor(Math.random() * 20) + 10,
-          totalDays: 30,
-          punctualityRate: Math.floor(Math.random() * 40) + 60
-        }))
-        .sort((a, b) => b.punctualityRate - a.punctualityRate)
-        .slice(0, 5);
+      setDepartments(realDepartments);
       
-      // Générer la liste des employés en retard
-      const mockLateEmployees = filteredEmployees
-        .map(emp => ({
-          id: emp.id,
-          name: `${emp.firstName} ${emp.lastName}`,
-          department: mockDepartments.find(d => d.id === emp.departmentId)?.name,
-          lateDays: Math.floor(Math.random() * 10) + 1,
-          totalDays: 30,
-          lateRate: Math.floor(Math.random() * 30) + 1
-        }))
-        .sort((a, b) => b.lateDays - a.lateDays)
-        .slice(0, 5);
+      // Filter employees by department
+      const filteredEmployees = selectedDepartment === 'all' 
+        ? employees
+        : employees.filter(emp => emp.department && (emp.department._id === selectedDepartment || emp.department.id === selectedDepartment));
       
-      setDepartments(mockDepartments);
-      setEmployees(filteredEmployees);
+      // Fetch attendance statistics by status
+      const params = new URLSearchParams();
+      
+      if (dateRange.startDate) {
+        params.append('startDate', dateRange.startDate.toISOString());
+      }
+      if (dateRange.endDate) {
+        params.append('endDate', dateRange.endDate.toISOString());
+      }
+      if (selectedDepartment && selectedDepartment !== 'all') {
+        params.append('department', selectedDepartment);
+      }
+      
+      const statsRes = await axios.get(`/api/attendance/stats?${params.toString()}`);
+      
+      let attendanceByStatus = {
+        present: 0,
+        late: 0,
+        absent: 0
+      };
+      
+      let attendanceByDepartment = {};
+      let attendanceByEmployee = {};
+      let attendanceByDate = {};
+      let topEmployees = [];
+      let lateEmployees = [];
+      
+      if (statsRes.data && statsRes.data.success) {
+        const statsData = statsRes.data.data;
+        
+        // Process real data from API
+        if (statsData.statusCounts) {
+          attendanceByStatus = {
+            present: statsData.statusCounts.present || 0,
+            late: statsData.statusCounts.late || 0,
+            absent: statsData.statusCounts.absent || 0
+          };
+        }
+        
+        if (statsData.departmentStats && Array.isArray(statsData.departmentStats)) {
+          statsData.departmentStats.forEach(dept => {
+            attendanceByDepartment[dept.name] = {
+              present: dept.presentCount || 0,
+              late: dept.lateCount || 0,
+              absent: dept.absentCount || 0
+            };
+          });
+        }
+        
+        if (statsData.employeeStats && Array.isArray(statsData.employeeStats)) {
+          statsData.employeeStats.forEach(emp => {
+            const empName = `${emp.firstName} ${emp.lastName}`;
+            attendanceByEmployee[empName] = {
+              present: emp.presentCount || 0,
+              late: emp.lateCount || 0,
+              absent: emp.absentCount || 0
+            };
+          });
+          
+          // Sort and extract top employees
+          topEmployees = statsData.employeeStats
+            .map(emp => ({
+              id: emp.id,
+              name: `${emp.firstName} ${emp.lastName}`,
+              department: emp.department?.name,
+              presentDays: emp.presentCount || 0,
+              totalDays: (emp.presentCount || 0) + (emp.lateCount || 0) + (emp.absentCount || 0),
+              punctualityRate: emp.punctualityRate || 0
+            }))
+            .sort((a, b) => b.punctualityRate - a.punctualityRate)
+            .slice(0, 5);
+          
+          // Sort and extract late employees
+          lateEmployees = statsData.employeeStats
+            .map(emp => ({
+              id: emp.id,
+              name: `${emp.firstName} ${emp.lastName}`,
+              department: emp.department?.name,
+              lateDays: emp.lateCount || 0,
+              totalDays: (emp.presentCount || 0) + (emp.lateCount || 0) + (emp.absentCount || 0),
+              lateRate: emp.lateRate || 0
+            }))
+            .sort((a, b) => b.lateRate - a.lateRate)
+            .slice(0, 5);
+        }
+        
+        if (statsData.dailyStats && Array.isArray(statsData.dailyStats)) {
+          statsData.dailyStats.forEach(day => {
+            const dateStr = new Date(day.date).toISOString().split('T')[0];
+            attendanceByDate[dateStr] = {
+              present: day.presentCount || 0,
+              late: day.lateCount || 0, 
+              absent: day.absentCount || 0
+            };
+          });
+        }
+      } else {
+        console.warn('Invalid attendance stats response format:', statsRes.data);
+      }
+      
       setAttendanceData({
-        byStatus: mockAttendanceByStatus,
-        byDepartment: mockAttendanceByDepartment,
-        byEmployee: mockAttendanceByEmployee,
-        byDate: mockAttendanceByDate,
-        topEmployees: mockTopEmployees,
-        lateEmployees: mockLateEmployees
+        byStatus: attendanceByStatus,
+        byDepartment: attendanceByDepartment,
+        byEmployee: attendanceByEmployee,
+        byDate: attendanceByDate,
+        topEmployees: topEmployees,
+        lateEmployees: lateEmployees
       });
       
       setLoading(false);
+      
     } catch (err) {
-      console.error('Erreur lors du chargement des données:', err);
+      console.error('Error fetching attendance data:', err);
       setError('Erreur lors du chargement des données. Veuillez réessayer plus tard.');
       setLoading(false);
     }

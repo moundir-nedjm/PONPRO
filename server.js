@@ -4,33 +4,44 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const http = require('http');
+const socketIo = require('socket.io');
+const seedDatabase = require('./server/seedData');
 
 // Load environment variables
 dotenv.config();
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/poinpro', {
+const MONGO_URI = 'mongodb+srv://testuser:testpassword123@cluster0.mongodb.net/poinpro-test?retryWrites=true&w=majority';
+mongoose.connect(process.env.MONGO_URI || MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => console.log('MongoDB Connected'))
+.then(() => {
+  console.log('MongoDB Connected');
+  // Run seed function to ensure we have test data
+  seedDatabase().then(() => {
+    console.log('Database seeding complete');
+  });
+})
 .catch(err => console.error('MongoDB Connection Error:', err));
 
-// Import routes
-const authRoutes = require('./src/routes/auth');
-const attendanceRoutes = require('./src/routes/attendance');
-const employeesRoutes = require('./src/routes/employees');
-const departmentsRoutes = require('./src/routes/departments');
-const leavesRoutes = require('./src/routes/leaves');
-const reportsRoutes = require('./src/routes/reports');
-const notificationsRoutes = require('./src/routes/notifications');
-const performanceRoutes = require('./src/routes/performance');
-const attendanceCodesRoutes = require('./src/routes/attendanceCodeRoutes');
-const documentsRoutes = require('./src/routes/documents');
-const schedulesRoutes = require('./src/routes/schedules');
-
 const app = express();
-const PORT = process.env.PORT || 50021;
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+const PORT = process.env.PORT || 5003;
+
+// Socket.io middleware to pass io to routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // Middleware
 app.use(cors());
@@ -43,18 +54,17 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to POINTGEE API' });
 });
 
+// Import routes
+const employeeRoutes = require('./server/routes/employee.routes');
+const departmentRoutes = require('./server/routes/department.routes');
+const attendanceRoutes = require('./server/routes/attendance.routes');
+const attendanceCodeRoutes = require('./server/routes/attendance-code.routes');
+
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/departments', departmentRoutes);
 app.use('/api/attendance', attendanceRoutes);
-app.use('/api/employees', employeesRoutes);
-app.use('/api/departments', departmentsRoutes);
-app.use('/api/leaves', leavesRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/notifications', notificationsRoutes);
-app.use('/api/performance', performanceRoutes);
-app.use('/api/attendance-codes', attendanceCodesRoutes);
-app.use('/api/documents', documentsRoutes);
-app.use('/api/schedules', schedulesRoutes);
+app.use('/api/attendance-codes', attendanceCodeRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
@@ -75,6 +85,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('New client connected');
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
+
+// Use server.listen instead of app.listen
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 
