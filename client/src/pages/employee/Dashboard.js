@@ -101,11 +101,24 @@ const EmployeeDashboard = () => {
     try {
       setLoading(true);
       const response = await axios.get(`/api/employees/${currentUser.id}/dashboard`);
-      setDashboardData(response.data);
+      // Ensure attendanceStats is always defined with default values
+      const data = response.data || {};
+      data.attendanceStats = data.attendanceStats || { 
+        present: 0, 
+        absent: 0, 
+        late: 0, 
+        onTime: 0 
+      };
+      data.todayStatus = data.todayStatus || null;
+      data.recentAttendance = data.recentAttendance || [];
+      data.upcomingLeaves = data.upcomingLeaves || [];
+      
+      setDashboardData(data);
       setError(null);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Impossible de charger les données du tableau de bord. Veuillez réessayer plus tard.');
+      // Ensure attendanceStats is defined with default values
       setDashboardData({
         attendanceStats: { present: 0, absent: 0, late: 0, onTime: 0 },
         todayStatus: null,
@@ -652,15 +665,18 @@ const EmployeeDashboard = () => {
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>Résumé</Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">Cette semaine</Typography>
-                  <Typography variant="body2" fontWeight={500}>{dashboardData?.attendanceStats.present || 0}/{dashboardData?.attendanceStats.present + dashboardData?.attendanceStats.absent || 0} jours</Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {(dashboardData?.attendanceStats?.present || 0)}/
+                    {((dashboardData?.attendanceStats?.present || 0) + (dashboardData?.attendanceStats?.absent || 0))} jours
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">A l'heure</Typography>
-                  <Typography variant="body2" fontWeight={500}>{dashboardData?.attendanceStats.onTime || 0} jours</Typography>
+                  <Typography variant="body2" fontWeight={500}>{dashboardData?.attendanceStats?.onTime || 0} jours</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" color="text.secondary">En retard</Typography>
-                  <Typography variant="body2" fontWeight={500}>{dashboardData?.attendanceStats.late || 0} jours</Typography>
+                  <Typography variant="body2" fontWeight={500}>{dashboardData?.attendanceStats?.late || 0} jours</Typography>
                 </Box>
               </Paper>
             </Grid>

@@ -1,19 +1,22 @@
 const Employee = require('../models/Employee');
-const crypto = require('crypto');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // In a production app, this would be stored in a secure environment variable
 const JWT_SECRET = 'pointgee_secure_jwt_secret_key';
 
-// Simple JWT token generation
-const generateToken = (userId) => {
-  const payload = {
-    userId,
-    iat: Date.now(),
-    exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-  };
-  
-  // In a real app, this would use a proper JWT library
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
+// Generate JWT token
+const generateToken = (user) => {
+  return jwt.sign(
+    { 
+      id: user._id || user.id,
+      email: user.email,
+      role: user.role 
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 };
 
 // Handle user login
@@ -27,99 +30,261 @@ exports.login = async (req, res) => {
       console.log('Login rejected: No identifier provided');
       return res.status(400).json({
         success: false,
-        message: 'Email/ID is required'
+        message: 'Email/ID est requis'
       });
     }
     
-    // Find employee by email or employeeId
-    const employee = await Employee.findOne({
+    // Find user by email or employeeId
+    const user = await User.findOne({
       $or: [
         { email: identifier },
         { employeeId: identifier }
       ]
     });
     
-    if (!employee) {
+    if (!user) {
       console.log(`Login failed: User not found with identifier ${identifier}`);
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Identifiants invalides'
       });
     }
     
-    // For demo purposes, we're accepting any password
-    // Comment out password check for now
-    // In a real app, use proper password hashing and verification
-    console.log(`Login successful for ${employee.email} (${employee.firstName} ${employee.lastName}) with role: ${employee.role}`);
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
     
-    // Generate session token
-    const token = generateToken(employee._id);
+    if (!isValidPassword) {
+      console.log(`Login failed: Invalid password for ${identifier}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Identifiants invalides'
+      });
+    }
     
-    // Convert Mongoose document to plain object and remove sensitive fields
-    const user = employee.toObject();
-    delete user.password;
+    console.log(`Login successful for ${user.email} (${user.name}) with role: ${user.role}`);
+    
+    // Update last login time
+    await User.findByIdAndUpdate(user._id, {
+      lastLogin: new Date()
+    });
+    
+    // Generate JWT token
+    const token = generateToken(user);
+    
+    // Convert document to plain object and remove sensitive fields
+    const userObj = user.toObject();
+    delete userObj.password;
     
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'Connexion réussie',
       token,
-      user
+      user: userObj
     });
   } catch (err) {
     console.error('Error during login:', err);
     res.status(500).json({
       success: false,
-      message: 'Server error during login'
+      message: 'Erreur serveur lors de la connexion'
     });
   }
 };
 
 // Handle user logout
 exports.logout = async (req, res) => {
-  // In a real app with proper JWT implementation,
-  // you might want to invalidate the token here
+  // In a stateless JWT implementation, the client is responsible for removing the token
   res.status(200).json({
     success: true,
-    message: 'Logout successful'
+    message: 'Déconnexion réussie'
   });
+};
+
+// Create a new user account (Admin only)
+exports.createUser = async (req, res) => {
+  try {
+    const { name, email, password, role, employeeId, projects } = req.body;
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email déjà enregistré'
+      });
+    }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Create new user
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: role || 'employee',
+      employeeId,
+      projects,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    // Don't return password
+    const userObj = newUser.toObject();
+    delete userObj.password;
+    
+    res.status(201).json({
+      success: true,
+      message: 'Utilisateur créé avec succès',
+      user: userObj
+    });
+  } catch (err) {
+    console.error('Error creating user:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la création de l\'utilisateur'
+    });
+  }
 };
 
 // Get current user profile
 exports.getProfile = async (req, res) => {
   try {
-    // In a real app, this would use the authenticated user ID from req.user
-    // which would be set by an auth middleware
     const userId = req.params.id;
     
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'ID utilisateur requis'
       });
     }
     
-    const employee = await Employee.findById(userId);
+    const user = await User.findById(userId);
     
-    if (!employee) {
+    if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'Utilisateur non trouvé'
       });
     }
     
     // Convert to plain object and remove sensitive fields
-    const user = employee.toObject();
-    delete user.password;
+    const userObj = user.toObject();
+    delete userObj.password;
     
     res.status(200).json({
       success: true,
-      data: user
+      data: userObj
     });
   } catch (err) {
     console.error('Error fetching user profile:', err);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching profile'
+      message: 'Erreur serveur lors de la récupération du profil'
+    });
+  }
+};
+
+// Get all users (Admin only)
+exports.getAllUsers = async (req, res) => {
+  try {
+    // Check if employeeId filter is provided
+    const { employeeId } = req.query;
+    
+    // Build filter query
+    let query = {};
+    if (employeeId) {
+      query.employeeId = employeeId;
+    }
+    
+    const users = await User.find(query).select('-password');
+    
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
+    });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la récupération des utilisateurs'
+    });
+  }
+};
+
+// Update a user
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { name, email, role, projects, password } = req.body;
+    
+    // Build update object
+    const updateData = {
+      name,
+      email,
+      role,
+      projects,
+      updatedAt: new Date()
+    };
+    
+    // If password is being updated, hash it
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+    
+    // Find and update user
+    const user = await User.findByIdAndUpdate(
+      userId, 
+      { $set: updateData }, 
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Utilisateur mis à jour avec succès',
+      data: user
+    });
+  } catch (err) {
+    console.error('Error updating user:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la mise à jour de l\'utilisateur'
+    });
+  }
+};
+
+// Delete a user
+exports.deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    const user = await User.findByIdAndDelete(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Utilisateur supprimé avec succès'
+    });
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de la suppression de l\'utilisateur'
     });
   }
 }; 

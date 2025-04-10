@@ -22,8 +22,12 @@ import {
   TableRow,
   Card,
   CardContent,
-  Snackbar
+  Snackbar,
+  useMediaQuery,
+  Stack,
+  TextField
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -52,6 +56,9 @@ const reportTypes = [
 ];
 
 const ReportGenerator = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
   const [activeTab, setActiveTab] = useState(0);
   const [selectedReport, setSelectedReport] = useState(reportTypes[0].id);
   const [dateRange, setDateRange] = useState({
@@ -208,90 +215,102 @@ const ReportGenerator = () => {
   const ReportComponent = reportTypes[activeTab].component;
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3 } }}>
+        <Typography 
+          variant="h5" 
+          component="h1" 
+          gutterBottom
+          sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}
+        >
           Générateur de Rapports
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={pdfLoading ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
-          onClick={generatePDF}
-          disabled={loading || pdfLoading}
-        >
-          Exporter en PDF
-        </Button>
-      </Box>
+        <Typography color="textSecondary" gutterBottom sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+          Générez des rapports détaillés sur la présence, les congés et la performance des employés.
+        </Typography>
+      </Paper>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Tabs
-              value={activeTab}
-              onChange={handleTabChange}
-              centered
-              indicatorColor="primary"
-              textColor="primary"
-              variant="fullWidth"
-              aria-label="rapport tabs"
-            >
-              {reportTypes.map((report, index) => (
-                <Tab key={report.id} label={report.label} />
-              ))}
-            </Tabs>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-          </Grid>
-          
-          <Grid item xs={12} sm={4} md={3}>
+      <Paper sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          aria-label="report type tabs"
+        >
+          {reportTypes.map((report, index) => (
+            <Tab
+              key={report.id}
+              label={report.label}
+              id={`report-tab-${index}`}
+              aria-controls={`report-tabpanel-${index}`}
+            />
+          ))}
+        </Tabs>
+      </Paper>
+
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <FilterIcon color="primary" sx={{ mr: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
+          <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+            Filtres de Rapport
+          </Typography>
+        </Box>
+        <Grid container spacing={{ xs: 2, sm: 3 }}>
+          {/* Date Filters */}
+          <Grid item xs={12} md={6}>
             <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
-              <DatePicker
-                label="Date de début"
-                value={dateRange.startDate}
-                onChange={(date) => handleDateChange('startDate', date)}
-                slotProps={{ textField: { fullWidth: true, margin: 'normal' } }}
-              />
+              <Grid container spacing={{ xs: 1, sm: 2 }}>
+                <Grid item xs={12} sm={6}>
+                  <DatePicker
+                    label="Date de début"
+                    value={dateRange.startDate}
+                    onChange={(date) => handleDateChange('startDate', date)}
+                    renderInput={(params) => <TextField {...params} fullWidth size={isMobile ? "small" : "medium"} />}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <DatePicker
+                    label="Date de fin"
+                    value={dateRange.endDate}
+                    onChange={(date) => handleDateChange('endDate', date)}
+                    renderInput={(params) => <TextField {...params} fullWidth size={isMobile ? "small" : "medium"} />}
+                  />
+                </Grid>
+              </Grid>
             </LocalizationProvider>
           </Grid>
           
-          <Grid item xs={12} sm={4} md={3}>
-            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
-              <DatePicker
-                label="Date de fin"
-                value={dateRange.endDate}
-                onChange={(date) => handleDateChange('endDate', date)}
-                slotProps={{ textField: { fullWidth: true, margin: 'normal' } }}
-              />
-            </LocalizationProvider>
-          </Grid>
-          
-          <Grid item xs={12} sm={4} md={3}>
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="department-select-label">Département</InputLabel>
+          {/* Department Filter */}
+          <Grid item xs={12} sm={6} md={4}>
+            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+              <InputLabel id="department-label">Département</InputLabel>
               <Select
-                labelId="department-select-label"
+                labelId="department-label"
                 id="department-select"
                 value={selectedDepartment}
                 label="Département"
                 onChange={handleDepartmentChange}
               >
                 <MenuItem value="all">Tous les départements</MenuItem>
-                {departments.map((dept) => (
-                  <MenuItem key={dept._id} value={dept._id}>{dept.name}</MenuItem>
+                {departments.map((department) => (
+                  <MenuItem key={department._id} value={department._id}>
+                    {department.name}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
           
-          <Grid item xs={12} sm={4} md={3} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Reset Button */}
+          <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', alignItems: { xs: 'flex-start', md: 'center' } }}>
             <Button
               variant="outlined"
+              color="secondary"
               startIcon={<ResetIcon />}
               onClick={handleResetFilters}
-              sx={{ mt: 2 }}
+              fullWidth
+              size={isMobile ? "small" : "medium"}
             >
               Réinitialiser
             </Button>
@@ -299,25 +318,89 @@ const ReportGenerator = () => {
         </Grid>
       </Paper>
 
-      <Box ref={reportContainerRef}>
-        <Paper sx={{ p: 3 }}>
-          {error ? (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          ) : loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <ReportComponent 
-              dateRange={dateRange}
-              department={selectedDepartment}
-              departments={departments}
-            />
-          )}
-        </Paper>
-      </Box>
+      <Stack 
+        direction={{ xs: 'column', sm: 'row' }} 
+        spacing={{ xs: 1, sm: 2 }}
+        sx={{ 
+          mb: { xs: 2, sm: 3 },
+          justifyContent: { xs: 'stretch', sm: 'flex-end' }
+        }}
+      >
+        <Button
+          variant="outlined"
+          color="primary"
+          startIcon={<PrintIcon />}
+          onClick={() => window.print()}
+          fullWidth={isMobile}
+          size={isMobile ? "small" : "medium"}
+        >
+          Imprimer
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={pdfLoading ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
+          onClick={generatePDF}
+          disabled={pdfLoading}
+          fullWidth={isMobile}
+          size={isMobile ? "small" : "medium"}
+        >
+          {isMobile ? 'PDF' : 'Exporter en PDF'}
+        </Button>
+      </Stack>
+
+      <Paper 
+        ref={reportContainerRef} 
+        sx={{ 
+          p: { xs: 2, sm: 3 }, 
+          mb: { xs: 2, sm: 3 },
+          overflow: 'auto'
+        }}
+      >
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' }, 
+            justifyContent: 'space-between', 
+            alignItems: { xs: 'flex-start', sm: 'center' }, 
+            mb: { xs: 2, sm: 3 }
+          }}
+        >
+          <Typography 
+            variant="h6" 
+            component="h2"
+            sx={{ 
+              fontSize: { xs: '1rem', sm: '1.25rem' },
+              mb: { xs: 1, sm: 0 }
+            }}
+          >
+            {reportTypes.find(r => r.id === selectedReport)?.label || 'Rapport'}
+          </Typography>
+          <Typography 
+            variant="subtitle2" 
+            color="textSecondary"
+            sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+          >
+            {`Période: ${format(dateRange.startDate, 'dd/MM/yyyy')} - ${format(dateRange.endDate, 'dd/MM/yyyy')}`}
+          </Typography>
+        </Box>
+
+        {error ? (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        ) : loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <ReportComponent 
+            dateRange={dateRange}
+            department={selectedDepartment}
+            departments={departments}
+          />
+        )}
+      </Paper>
 
       <Snackbar
         open={snackbar.open}

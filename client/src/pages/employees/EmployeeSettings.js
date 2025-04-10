@@ -88,7 +88,7 @@ const EmployeeSettings = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Détails des Employés
+        Gestion des Employés
       </Typography>
       
       <Paper sx={{ p: 2, mb: 3 }}>

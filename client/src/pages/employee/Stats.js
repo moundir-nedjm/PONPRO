@@ -182,48 +182,44 @@ const EmployeeStats = () => {
         <Grid item xs={12} sm={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.main', color: 'white' }}>
             <Typography variant="h6" gutterBottom>Total Jours</Typography>
-            <Typography variant="h4">{statsData.overallStats.totalDays}</Typography>
+            <Typography variant="h4">{statsData.overallStats?.totalDays || 0}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.main', color: 'white' }}>
             <Typography variant="h6" gutterBottom>Jours Présent</Typography>
-            <Typography variant="h4">{statsData.overallStats.presentDays}</Typography>
+            <Typography variant="h4">{statsData.overallStats?.presentDays || 0}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.main', color: 'white' }}>
             <Typography variant="h6" gutterBottom>Jours Absent</Typography>
-            <Typography variant="h4">{statsData.overallStats.absentDays}</Typography>
+            <Typography variant="h4">{statsData.overallStats?.absentDays || 0}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.main', color: 'white' }}>
             <Typography variant="h6" gutterBottom>Jours en Retard</Typography>
-            <Typography variant="h4">{statsData.overallStats.lateDays}</Typography>
+            <Typography variant="h4">{statsData.overallStats?.lateDays || 0}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.main', color: 'white' }}>
             <Typography variant="h6" gutterBottom>Heures Moyennes</Typography>
-            <Typography variant="h4">{statsData.overallStats.averageWorkHours.toFixed(1)}</Typography>
+            <Typography variant="h4">{statsData.overallStats?.averageWorkHours?.toFixed(1) || '0.0'}</Typography>
           </Paper>
         </Grid>
       </Grid>
       
-      {/* Attendance by Month */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card>
-            <CardHeader 
-              title="Tendance de Présence Mensuelle" 
-              avatar={<Avatar sx={{ bgcolor: 'primary.main' }}><TrendingUpIcon /></Avatar>}
-            />
-            <Divider />
-            <CardContent sx={{ height: 350 }}>
+      {/* Monthly Attendance Trends */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Tendances de Présence Mensuelle</Typography>
+            <Box sx={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={statsData.attendanceByMonth}
+                  data={statsData.attendanceByMonth || []}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -231,102 +227,88 @@ const EmployeeStats = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="present" name="Présent" stroke="#4caf50" activeDot={{ r: 8 }} />
-                  <Line type="monotone" dataKey="absent" name="Absent" stroke="#f44336" />
-                  <Line type="monotone" dataKey="late" name="En retard" stroke="#ff9800" />
+                  <Line type="monotone" dataKey="present" stroke="#4caf50" name="Jours Présent" />
+                  <Line type="monotone" dataKey="absent" stroke="#f44336" name="Jours Absent" />
+                  <Line type="monotone" dataKey="late" stroke="#ff9800" name="Jours en Retard" />
                 </LineChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </Box>
+          </Paper>
         </Grid>
-        
-        {/* Attendance Distribution */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardHeader 
-              title="Répartition de Présence" 
-              avatar={<Avatar sx={{ bgcolor: 'secondary.main' }}><PieChart /></Avatar>}
-            />
-            <Divider />
-            <CardContent sx={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Distribution de Présence</Typography>
+            <Box sx={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={statsData.attendanceDistribution}
+                    data={[
+                      { name: 'Présent', value: statsData.overallStats?.presentDays || 0, fill: '#4caf50' },
+                      { name: 'Absent', value: statsData.overallStats?.absentDays || 0, fill: '#f44336' },
+                      { name: 'En Retard', value: statsData.overallStats?.lateDays || 0, fill: '#ff9800' }
+                    ]}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
-                    nameKey="name"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
-                    {statsData.attendanceDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
                   </Pie>
                   <Tooltip />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </Box>
+          </Paper>
         </Grid>
-        
-        {/* Work Hours by Day of Week */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardHeader 
-              title="Heures de Travail par Jour" 
-              avatar={<Avatar sx={{ bgcolor: 'info.main' }}><AccessTimeIcon /></Avatar>}
-            />
-            <Divider />
-            <CardContent sx={{ height: 350 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={statsData.workHoursStats}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="hours" name="Heures de Travail" fill="#2196f3" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        {/* Attendance by Day of Week */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardHeader 
-              title="Présence par Jour de Semaine" 
-              avatar={<Avatar sx={{ bgcolor: 'warning.main' }}><DateRangeIcon /></Avatar>}
-            />
-            <Divider />
-            <CardContent sx={{ height: 350 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={statsData.attendanceByDay}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="present" name="Présent" stackId="a" fill="#4caf50" />
-                  <Bar dataKey="absent" name="Absent" stackId="a" fill="#f44336" />
-                  <Bar dataKey="late" name="En retard" stackId="a" fill="#ff9800" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </Grid>
+      </Grid>
+      
+      {/* Work Hours by Day of Week */}
+      <Grid item xs={12} md={6}>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>Heures de Travail par Jour</Typography>
+          <Box sx={{ height: 300 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={statsData.workHoursStats || []}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="hours" fill="#3f51b5" name="Heures" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
+      </Grid>
+      
+      {/* Attendance by Day of Week */}
+      <Grid item xs={12} md={6}>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>Présence par Jour de Semaine</Typography>
+          <Box sx={{ height: 300 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={statsData.attendanceByDay || []}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="present" fill="#4caf50" name="Présent" />
+                <Bar dataKey="absent" fill="#f44336" name="Absent" />
+                <Bar dataKey="late" fill="#ff9800" name="En Retard" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
       </Grid>
     </Box>
   );

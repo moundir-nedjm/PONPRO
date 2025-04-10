@@ -374,11 +374,6 @@ const menuItems = [
         roles: ['admin']
       },
       {
-        title: 'Détails de l\'Employé',
-        path: '/employees/settings',
-        roles: ['admin', 'manager']
-      },
-      {
         title: 'General',
         path: '/settings',
         roles: ['admin', 'manager', 'user']

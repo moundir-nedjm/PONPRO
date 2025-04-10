@@ -33,7 +33,9 @@ import {
   MenuItem,
   LinearProgress,
   Menu,
-  Tooltip
+  Tooltip,
+  FormHelperText,
+  ListSubheader
 } from '@mui/material';
 import {
   Description as DescriptionIcon,
@@ -60,7 +62,9 @@ import {
   Cancel as CancelIcon,
   Help as HelpIcon,
   Dashboard as DashboardIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  People as PeopleIcon,
+  AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import apiClient from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
@@ -94,6 +98,8 @@ const DocumentManagement = () => {
   const [teamDocuments, setTeamDocuments] = useState([]);
   const [viewingMode, setViewingMode] = useState(currentUser.role === 'admin' ? 'all' : 'personal');
   const [deletedDocumentIds, setDeletedDocumentIds] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   
   const fileInputRef = useRef(null);
   
@@ -103,9 +109,11 @@ const DocumentManagement = () => {
   
   const documentCategories = [
     { id: 'identity', label: 'Pièces d\'identité', icon: <BadgeIcon /> },
+    { id: 'family', label: 'Situation Familiale', icon: <PeopleIcon /> },
     { id: 'education', label: 'Diplômes et Formations', icon: <SchoolIcon /> },
     { id: 'professional', label: 'Documents Professionnels', icon: <WorkIcon /> },
-    { id: 'health', label: 'Santé et Sécurité', icon: <HealthIcon /> },
+    { id: 'health', label: 'Santé et Assurance', icon: <HealthIcon /> },
+    { id: 'financial', label: 'Documents Financiers', icon: <AccountBalanceIcon /> },
     { id: 'other', label: 'Autres Documents', icon: <FileIcon /> },
   ];
   
@@ -115,26 +123,59 @@ const DocumentManagement = () => {
       { id: 'passport', label: 'Passeport' },
       { id: 'residence_permit', label: 'Titre de Séjour' },
       { id: 'birth_certificate', label: 'Acte de Naissance' },
+      { id: 'driver_license', label: 'Permis de Conduire' },
+      { id: 'electoral_card', label: 'Carte Électorale' }
+    ],
+    family: [
+      { id: 'marriage_certificate', label: 'Acte de Mariage' },
+      { id: 'family_record', label: 'Livret de Famille' },
+      { id: 'divorce_decree', label: 'Jugement de Divorce' },
+      { id: 'child_birth', label: 'Acte de Naissance Enfant' },
+      { id: 'pacs', label: 'Attestation PACS' }
     ],
     education: [
-      { id: 'diploma', label: 'Diplôme' },
-      { id: 'certificate', label: 'Certificat' },
-      { id: 'training', label: 'Formation' },
+      { id: 'diploma_high_school', label: 'Diplôme Baccalauréat' },
+      { id: 'diploma_bachelor', label: 'Diplôme Licence/Bachelor' },
+      { id: 'diploma_master', label: 'Diplôme Master' },
+      { id: 'diploma_doctorate', label: 'Diplôme Doctorat' },
+      { id: 'certificate', label: 'Certificat Professionnel' },
+      { id: 'training', label: 'Attestation de Formation' },
       { id: 'transcript', label: 'Relevé de Notes' },
+      { id: 'language_certificate', label: 'Certificat de Langue' }
     ],
     professional: [
       { id: 'resume', label: 'CV' },
       { id: 'contract', label: 'Contrat de Travail' },
+      { id: 'amendment', label: 'Avenant au Contrat' },
       { id: 'reference', label: 'Lettre de Référence' },
       { id: 'evaluation', label: 'Évaluation Professionnelle' },
+      { id: 'work_certificate', label: 'Certificat de Travail' },
+      { id: 'non_compete', label: 'Clause de Non-Concurrence' },
+      { id: 'confidentiality', label: 'Accord de Confidentialité' }
     ],
     health: [
       { id: 'medical_certificate', label: 'Certificat Médical' },
       { id: 'vaccination', label: 'Carnet de Vaccination' },
-      { id: 'insurance', label: 'Assurance Santé' },
+      { id: 'insurance_health', label: 'Assurance Maladie' },
+      { id: 'insurance_life', label: 'Assurance Vie' },
+      { id: 'insurance_liability', label: 'Assurance Responsabilité Civile' },
       { id: 'safety_training', label: 'Formation Sécurité' },
+      { id: 'disability', label: 'Attestation d\'Invalidité' },
+      { id: 'work_accident', label: 'Déclaration Accident du Travail' }
+    ],
+    financial: [
+      { id: 'pay_slip', label: 'Bulletin de Paie' },
+      { id: 'tax_notice', label: 'Avis d\'Imposition' },
+      { id: 'bank_details', label: 'RIB/Coordonnées Bancaires' },
+      { id: 'savings_account', label: 'Relevé de Compte Épargne' },
+      { id: 'loan_agreement', label: 'Contrat de Prêt' },
+      { id: 'pension_statement', label: 'Relevé de Retraite' }
     ],
     other: [
+      { id: 'housing', label: 'Contrat de Bail/Titre de Propriété' },
+      { id: 'utility_bill', label: 'Facture (Eau, Électricité, etc.)' },
+      { id: 'car_registration', label: 'Carte Grise' },
+      { id: 'insurance_car', label: 'Assurance Véhicule' },
       { id: 'other', label: 'Autre Document' },
     ],
   };
@@ -149,6 +190,7 @@ const DocumentManagement = () => {
     fetchDocuments();
     if (isAdmin || isChef) {
       fetchTeamDocuments();
+      fetchEmployees();
     }
   }, [currentUser]);
   
@@ -231,6 +273,24 @@ const DocumentManagement = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const response = await apiClient.get('/employees');
+      
+      if (response.data && response.data.success) {
+        const employeeData = response.data.data || [];
+        console.log('Successfully fetched employees:', employeeData.length);
+        setEmployees(employeeData);
+      } else {
+        console.error('API returned invalid format for employees:', response.data);
+        setEmployees([]);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+      setEmployees([]);
+    }
+  };
+
   const filterDocuments = () => {
     let docsToFilter = [];
     
@@ -302,6 +362,7 @@ const DocumentManagement = () => {
     setDocumentType('');
     setDocumentDescription('');
     setUploadProgress(0);
+    setSelectedEmployeeId(currentUser.id);
   };
   
   const handleCloseUploadDialog = () => {
@@ -537,50 +598,59 @@ const DocumentManagement = () => {
               mb: 1,
               borderRadius: 1,
               backgroundColor: 'background.paper',
-              boxShadow: 1
+              boxShadow: 1,
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              py: { xs: 1.5, sm: 1 },
+              px: { xs: 2, sm: 2 }
             }}
           >
-            <ListItemIcon>
-              {getDocumentIcon(doc.mimeType)}
-            </ListItemIcon>
-            <ListItemText
-              primary={
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body1">{doc.name}</Typography>
-                  {/* Show user name for documents not belonging to current user */}
-                  {doc.userId !== currentUser.id && doc.userName && (
-                    <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                      ({doc.userName})
+            <Box sx={{ display: 'flex', width: '100%', alignItems: 'center', mb: { xs: 1, sm: 0 } }}>
+              <ListItemIcon sx={{ minWidth: { xs: 36, sm: 42 } }}>
+                {getDocumentIcon(doc.mimeType)}
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Typography variant="body1" noWrap sx={{ maxWidth: { xs: '180px', sm: '220px', md: 'none' } }}>
+                      {doc.name}
                     </Typography>
-                  )}
-                </Box>
-              }
-              secondary={
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {doc.description || "Aucune description"}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Uploadé le {new Date(doc.uploadDate).toLocaleDateString()}
-                  </Typography>
-                </Box>
-              }
-            />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
-              {getStatusChip(doc.status)}
-              {doc.shared && (
-                <Chip label="Partagé" color="primary" size="small" icon={<ShareIcon fontSize="small" />} variant="outlined" />
-              )}
+                    {/* Show user name for documents not belonging to current user */}
+                    {doc.userId !== currentUser.id && doc.userName && (
+                      <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                        ({doc.userName})
+                      </Typography>
+                    )}
+                  </Box>
+                }
+                secondary={
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: '-webkit-box', overflow: 'hidden', WebkitBoxOrient: 'vertical', WebkitLineClamp: 1 }}>
+                      {doc.description || "Aucune description"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Uploadé le {new Date(doc.uploadDate).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                }
+              />
             </Box>
-            <ListItemSecondaryAction>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mt: { xs: 1, sm: 0 } }}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {getStatusChip(doc.status)}
+                {doc.shared && (
+                  <Chip label="Partagé" color="primary" size="small" icon={<ShareIcon fontSize="small" />} variant="outlined" />
+                )}
+              </Box>
               <IconButton
                 edge="end"
                 aria-label="more"
                 onClick={(e) => handleMenuOpen(e, doc)}
+                size="small"
               >
                 <MoreIcon />
               </IconButton>
-            </ListItemSecondaryAction>
+            </Box>
           </ListItem>
         ))}
       </List>
@@ -589,6 +659,10 @@ const DocumentManagement = () => {
   
   const handleViewingModeChange = (event) => {
     setViewingMode(event.target.value);
+  };
+  
+  const handleEmployeeChange = (event) => {
+    setSelectedEmployeeId(event.target.value);
   };
   
   if (loading && documents.length === 0) {
@@ -600,11 +674,11 @@ const DocumentManagement = () => {
   }
   
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 3, mb: 3 }}>
+    <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 2, sm: 4 }, px: { xs: 1, sm: 2, md: 3 } }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <DescriptionIcon color="primary" sx={{ fontSize: 28, mr: 1 }} />
-          <Typography variant="h5" component="h1">
+          <DescriptionIcon color="primary" sx={{ fontSize: { xs: 24, sm: 28 }, mr: 1 }} />
+          <Typography variant="h5" component="h1" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
             Gestion des Renseignements
           </Typography>
         </Box>
@@ -634,8 +708,8 @@ const DocumentManagement = () => {
       )}
       
       {/* Filter, Search and View Controls */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
+      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
+        <Grid container spacing={{ xs: 1, sm: 2 }} alignItems="center">
           {/* First row for role-specific view options */}
           {(isAdmin || isChef) && (
             <Grid item xs={12} sx={{ mb: 1 }}>
@@ -735,33 +809,37 @@ const DocumentManagement = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={12} md={4} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <Box sx={{ mr: 1 }}>
+          <Grid item xs={12} sm={12} md={4} sx={{ display: 'flex', justifyContent: { xs: 'center', md: 'flex-end' }, mt: { xs: 1, sm: 0 } }}>
+            <Box sx={{ mr: 1, display: 'flex' }}>
               <Tooltip title="Vue liste">
                 <IconButton 
+                  size="medium"
                   color={viewMode === 'list' ? 'primary' : 'default'} 
                   onClick={() => handleViewModeChange('list')}
                 >
-                  <DescriptionIcon />
+                  <DescriptionIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Vue tableau de bord">
                 <IconButton 
+                  size="medium"
                   color={viewMode === 'dashboard' ? 'primary' : 'default'} 
                   onClick={() => handleViewModeChange('dashboard')}
                 >
-                  <DashboardIcon />
+                  <DashboardIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             </Box>
             <Button
               variant="contained"
               color="primary"
+              size="medium"
               startIcon={<UploadIcon />}
               onClick={handleOpenUploadDialog}
               disabled={viewingMode !== 'personal' && viewingMode !== 'all'}
+              sx={{ whiteSpace: 'nowrap' }}
             >
-              Ajouter un Document
+              {window.innerWidth <= 600 ? 'Ajouter' : 'Ajouter un Document'}
             </Button>
           </Grid>
         </Grid>
@@ -791,6 +869,15 @@ const DocumentManagement = () => {
               variant="scrollable"
               scrollButtons="auto"
               allowScrollButtonsMobile
+              sx={{ 
+                minHeight: { xs: '42px', sm: '48px' }, 
+                '& .MuiTab-root': { 
+                  minHeight: { xs: '42px', sm: '48px' }, 
+                  py: { xs: 0.5, sm: 1 }, 
+                  px: { xs: 1, sm: 2 },
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                } 
+              }}
             >
               {documentCategories.map((category, index) => (
                 <Tab 
@@ -925,6 +1012,7 @@ const DocumentManagement = () => {
         onClose={handleCloseUploadDialog}
         maxWidth="md"
         fullWidth
+        sx={{ '& .MuiDialog-paper': { m: { xs: 1, sm: 2 }, width: { xs: 'calc(100% - 16px)', sm: 'auto' } } }}
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -938,6 +1026,38 @@ const DocumentManagement = () => {
           <DialogContentText sx={{ mb: 2 }}>
             Veuillez sélectionner un document à télécharger et fournir les informations nécessaires.
           </DialogContentText>
+          
+          {(isAdmin || isChef) && (
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel id="employee-label">Propriétaire du document</InputLabel>
+              <Select
+                labelId="employee-label"
+                id="employee-select"
+                value={selectedEmployeeId}
+                label="Propriétaire du document"
+                onChange={handleEmployeeChange}
+              >
+                <MenuItem value={currentUser.id}>
+                  Moi-même ({currentUser.name || 'Utilisateur actuel'})
+                </MenuItem>
+                <Divider />
+                {employees.map(employee => (
+                  <MenuItem key={employee._id} value={employee._id}>
+                    {employee.firstName} {employee.lastName} - {employee.employeeId}
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                Ce document sera ajouté au dossier de cet employé
+              </FormHelperText>
+            </FormControl>
+          )}
+          
+          {!isAdmin && !isChef && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Ce document sera ajouté à votre dossier personnel
+            </Alert>
+          )}
           
           <Box sx={{ py: 2, display: 'flex', justifyContent: 'center', mb: 2 }}>
             {selectedFile ? (
@@ -1001,19 +1121,25 @@ const DocumentManagement = () => {
               value={documentType}
               label="Type de Document"
               onChange={handleTypeChange}
+              MenuProps={{
+                PaperProps: {
+                  style: {
+                    maxHeight: 400
+                  }
+                }
+              }}
             >
-              {documentCategories.map(category => (
-                <Box key={category.id}>
-                  <MenuItem disabled sx={{ opacity: 0.7, fontWeight: 'bold' }}>
-                    {category.label}
+              {documentCategories.map(category => [
+                <ListSubheader key={`header-${category.id}`} sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                  {React.cloneElement(category.icon, { fontSize: 'small', sx: { mr: 1 } })}
+                  {category.label}
+                </ListSubheader>,
+                ...documentTypes[category.id].map(type => (
+                  <MenuItem key={type.id} value={type.id} sx={{ pl: 4 }}>
+                    {type.label}
                   </MenuItem>
-                  {documentTypes[category.id].map(type => (
-                    <MenuItem key={type.id} value={type.id} sx={{ pl: 4 }}>
-                      {type.label}
-                    </MenuItem>
-                  ))}
-                </Box>
-              ))}
+                ))
+              ]).flat()}
             </Select>
           </FormControl>
           
@@ -1053,7 +1179,8 @@ const DocumentManagement = () => {
                 )?.id]?.find(type => type.id === documentType)?.label || documentType : 
                 selectedFile?.name,
               description: documentDescription, 
-              category: documentType 
+              category: documentType,
+              userId: selectedEmployeeId
             })} 
             variant="contained" 
             color="primary"

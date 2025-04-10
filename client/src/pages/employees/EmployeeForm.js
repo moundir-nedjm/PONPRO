@@ -58,7 +58,12 @@ const EmployeeForm = () => {
     city: '',
     wilaya: '',
     postalCode: '',
-    active: true
+    active: true,
+    contractEndDate: null,
+    maritalStatus: '',
+    insuranceNumber: '',
+    insuranceProvider: '',
+    dependents: 0
   });
 
   useEffect(() => {
@@ -114,7 +119,12 @@ const EmployeeForm = () => {
               city: employeeData.address?.city || '',
               wilaya: employeeData.address?.wilaya || '',
               postalCode: employeeData.address?.postalCode || '',
-              active: employeeData.active
+              active: employeeData.active,
+              contractEndDate: employeeData.contractEndDate ? new Date(employeeData.contractEndDate) : null,
+              maritalStatus: employeeData.maritalStatus || '',
+              insuranceNumber: employeeData.insurance?.number || '',
+              insuranceProvider: employeeData.insurance?.provider || '',
+              dependents: employeeData.insurance?.dependents || 0
             });
           } else {
             throw new Error('Failed to fetch employee data');
@@ -184,7 +194,11 @@ const EmployeeForm = () => {
     wilaya: Yup.string()
       .required('La wilaya est requise'),
     postalCode: Yup.string()
-      .required('Le code postal est requis')
+      .required('Le code postal est requis'),
+    maritalStatus: Yup.string(),
+    insuranceNumber: Yup.string(),
+    insuranceProvider: Yup.string(),
+    dependents: Yup.number().min(0, 'Le nombre de personnes à charge ne peut pas être négatif')
   });
 
   const formik = useFormik({
@@ -216,7 +230,14 @@ const EmployeeForm = () => {
             wilaya: values.wilaya,
             postalCode: values.postalCode
           },
-          active: values.active
+          active: values.active,
+          contractEndDate: values.contractEndDate,
+          maritalStatus: values.maritalStatus,
+          insurance: {
+            number: values.insuranceNumber,
+            provider: values.insuranceProvider,
+            dependents: values.dependents
+          }
         };
         
         console.log('Saving employee data:', employeeData);
@@ -444,6 +465,27 @@ const EmployeeForm = () => {
             </Grid>
 
             <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel id="maritalStatus-label">Situation Familiale</InputLabel>
+                <Select
+                  labelId="maritalStatus-label"
+                  id="maritalStatus"
+                  name="maritalStatus"
+                  value={formik.values.maritalStatus}
+                  label="Situation Familiale"
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                >
+                  <MenuItem value="single">Célibataire</MenuItem>
+                  <MenuItem value="married">Marié(e)</MenuItem>
+                  <MenuItem value="divorced">Divorcé(e)</MenuItem>
+                  <MenuItem value="widowed">Veuf/Veuve</MenuItem>
+                  <MenuItem value="pacs">Pacsé(e)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 id="email"
@@ -532,6 +574,26 @@ const EmployeeForm = () => {
               </LocalizationProvider>
             </Grid>
 
+            <Grid item xs={12} sm={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
+                <DatePicker
+                  label="Date de Fin de Contrat"
+                  value={formik.values.contractEndDate}
+                  onChange={(value) => formik.setFieldValue('contractEndDate', value)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      id="contractEndDate"
+                      name="contractEndDate"
+                      error={formik.touched.contractEndDate && Boolean(formik.errors.contractEndDate)}
+                      helperText={formik.touched.contractEndDate && formik.errors.contractEndDate}
+                    />
+                  )}
+                />
+              </LocalizationProvider>
+            </Grid>
+
             <Grid item xs={12}>
               <FormControlLabel
                 control={
@@ -543,6 +605,58 @@ const EmployeeForm = () => {
                   />
                 }
                 label="Employé Actif"
+              />
+            </Grid>
+
+            {/* Insurance Information Section */}
+            <Grid item xs={12} sx={{ mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Informations d'Assurance
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                id="insuranceProvider"
+                name="insuranceProvider"
+                label="Prestataire d'Assurance"
+                value={formik.values.insuranceProvider}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.insuranceProvider && Boolean(formik.errors.insuranceProvider)}
+                helperText={formik.touched.insuranceProvider && formik.errors.insuranceProvider}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                id="insuranceNumber"
+                name="insuranceNumber"
+                label="Numéro d'Assurance"
+                value={formik.values.insuranceNumber}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.insuranceNumber && Boolean(formik.errors.insuranceNumber)}
+                helperText={formik.touched.insuranceNumber && formik.errors.insuranceNumber}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                id="dependents"
+                name="dependents"
+                label="Nombre de Personnes à Charge"
+                type="number"
+                value={formik.values.dependents}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.dependents && Boolean(formik.errors.dependents)}
+                helperText={formik.touched.dependents && formik.errors.dependents}
+                InputProps={{ inputProps: { min: 0 } }}
               />
             </Grid>
 

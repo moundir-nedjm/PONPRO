@@ -57,6 +57,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../utils/api';
 import FaceScanner from '../../components/attendance/FaceScanner';
+import UserCredentials from '../admin/UserCredentials';
 
 // TabPanel component for tabs
 function TabPanel(props) {
@@ -357,20 +358,28 @@ const EmployeeDetail = () => {
           <Typography variant="h6" gutterBottom>
             Sécurité et Accès
           </Typography>
-          
-          <Paper sx={{ p: 2 }}>
-            <List>
-              <ListItem>
-                <ListItemIcon>
-                  <SecurityIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Validation des données biométriques" 
-                  secondary="Les données biométriques sont cryptées et stockées de manière sécurisée conformément aux réglementations en vigueur."
-                />
-              </ListItem>
-            </List>
-          </Paper>
+        
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2 }}>
+                <List>
+                  <ListItem>
+                    <ListItemIcon>
+                      <SecurityIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Validation des données biométriques" 
+                      secondary="Les données biométriques sont cryptées et stockées de manière sécurisée conformément aux réglementations en vigueur."
+                    />
+                  </ListItem>
+                </List>
+              </Paper>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <UserCredentials employeeId={employee?.employeeId} />
+            </Grid>
+          </Grid>
         </Box>
         
         {/* Face Scanner Dialog */}
@@ -555,6 +564,7 @@ const EmployeeDetail = () => {
                 <Tab label="Pointages" />
                 <Tab label="Congés" />
                 <Tab label="Biométrie" />
+                {currentUser.role === 'admin' && <Tab label="Identifiants & Sécurité" />}
               </Tabs>
             </Box>
 
@@ -784,6 +794,15 @@ const EmployeeDetail = () => {
             <TabPanel value={tabValue} index={3}>
               {renderBiometricsTab()}
             </TabPanel>
+
+            {/* Credentials Tab - Admin Only */}
+            {currentUser.role === 'admin' && (
+              <TabPanel value={tabValue} index={4}>
+                <Box sx={{ p: 2 }}>
+                  <UserCredentials employeeId={employee?.employeeId} />
+                </Box>
+              </TabPanel>
+            )}
           </Paper>
         </Grid>
       </Grid>

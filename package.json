@@ -7,10 +7,14 @@
     "server": "nodemon server/server.js",
     "client": "cd client && npm start",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "port5000": "node server/server-port-5000.js",
     "seed": "node server/seed.js",
+    "seed:admin": "node server/seedAdmin.js",
+    "test:login": "node server/testLogin.js",
     "setup": "npm install && cd client && npm install && cd ../server && npm install",
     "build": "cd client && npm run build",
-    "deploy": "npm run build && wrangler pages deploy client/build"
+    "deploy": "npm run build && wrangler pages deploy client/build",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
